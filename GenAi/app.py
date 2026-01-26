@@ -68,11 +68,7 @@ def hr_questions():
     Generate {count} {level}-level interview question related to: {topic}
     
     The question should assess:
-    - Communication skills
-    - Problem-solving ability
-    - Teamwork and collaboration
-    - Confidence and attitude
-    
+    -related to topic based on prctical application
     Return ONLY the question text, nothing else.
     """
 
@@ -194,6 +190,9 @@ def evaluate():
     
     ## Final Recommendation
     [One sentence summary and encouragement]
+    ##Answer in markdown format.
+    return actual answer of question which HR expects.
+    Answer the question in Candidate style that HR except
     """
 
     try:

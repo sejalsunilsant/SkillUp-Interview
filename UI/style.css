@@ -211,20 +211,62 @@ button {
 }
 
 /* ============================================================
-   MAIN GRID
+   MAIN GRID - FIXED 2x2 EQUAL LAYOUT
    ============================================================ */
 
 .main-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr); 
+  grid-template-rows: 1fr 1fr;
+  gap: 20px;
+  height: 70vh;
+  align-items: stretch;
+}
+
+.main-grid > * {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-left {
+  grid-row: 1;
+  grid-column: 1;
   gap: 20px;
 }
 
-.left-column,
-.right-column {
-  display: flex;
-  flex-direction: column;
+.video-section {
+  flex: 2;
+}
+
+.bottom-left {
+  grid-row: 2;
+  grid-column: 1;
   gap: 20px;
+}
+
+.top-right {
+  grid-row: 1;
+  grid-column: 2;
+  gap: 20px;
+}
+
+.question-section {
+  flex: 1;
+}
+
+.bottom-right {
+  grid-row: 2;
+  grid-column: 2;
+  gap: 20px;
+}
+
+.controls-section {
+  flex: 1;
+}
+
+.feedback-section {
+  flex: 1;
 }
 
 /* ============================================================
@@ -233,16 +275,21 @@ button {
 
 .video-section {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .video-container {
   position: relative;
-  width: 100%;
+  flex: 1;
   aspect-ratio: 16 / 9;
   background: var(--bg-tertiary);
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #video {
@@ -339,7 +386,7 @@ button {
    TRANSCRIPT SECTION
    ============================================================ */
 
-.transcript-box {
+.transcript-section .transcript-box {
   background: var(--bg-tertiary);
   border: 2px solid var(--navy-primary);
   border-radius: 8px;
@@ -350,6 +397,7 @@ button {
   color: var(--text-primary);
   font-size: 1em;
   line-height: 1.8;
+  flex: 1;
 }
 
 .transcript-box::-webkit-scrollbar {
@@ -385,12 +433,14 @@ button {
   color: var(--text-primary);
   font-weight: 500;
   margin-bottom: 16px;
+  flex: 1;
 }
 
 .session-info {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  flex: 1;
 }
 
 .info-item {
@@ -447,6 +497,7 @@ button {
   justify-content: center;
   gap: 12px;
   margin-top: 12px;
+  flex: 1;
 }
 
 .timer-icon {
@@ -468,6 +519,7 @@ button {
   color: var(--text-primary);
   line-height: 1.8;
   margin-bottom: 16px;
+  flex: 1;
 }
 
 .feedback-box h3 {
@@ -586,6 +638,9 @@ button {
 @media (max-width: 1024px) {
   .main-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+    height: auto;
+    gap: 16px;
   }
   
   .setup-grid {
@@ -617,6 +672,13 @@ button {
   .btn-large {
     padding: 14px 24px;
     font-size: 1em;
+  }
+  
+  .main-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    height: auto;
+    gap: 12px;
   }
 }
 

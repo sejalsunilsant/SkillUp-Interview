@@ -36,11 +36,11 @@
       </div>
     </div>
 
-    <!-- Main Interview Grid -->
+    <!-- Main Interview Grid - NEW 2x2 LAYOUT -->
     <div class="main-grid hidden" id="main-grid">
-      <!-- Left Column: Video & Transcript -->
-      <div class="left-column">
-        <!-- Video Section -->
+      <!-- TOP-LEFT: Video & Posture (BIG) + BOTTOM-LEFT: Speech-to-Text -->
+      <div class="top-left">
+        <!-- Video Section (BIG) -->
         <div class="section video-section">
           <div class="section-header">
             <h2 class="section-title">Live Video</h2>
@@ -58,10 +58,10 @@
           </div>
         </div>
 
-        <!-- Transcript Section -->
+        <!-- Speech-to-Text (Transcript) -->
         <div class="section transcript-section">
           <div class="section-header">
-            <h2 class="section-title">Live Transcription</h2>
+            <h2 class="section-title">Speech-to-Text</h2>
             <div id="transcript-status" class="status-badge status-inactive">Ready</div>
           </div>
           <div id="transcript-display" class="transcript-box">
@@ -70,9 +70,8 @@
         </div>
       </div>
 
-      <!-- Right Column: Question & Controls -->
-      <div class="right-column">
-        <!-- Interview Question -->
+      <!-- TOP-RIGHT: Interview Question -->
+      <div class="top-right">
         <div class="section question-section">
           <h2 class="section-title">Interview Question</h2>
           <div id="question-display" class="question-box">
@@ -95,23 +94,30 @@
             </div>
           </div>
         </div>
+      </div>
 
+      <!-- BOTTOM-RIGHT: Controls + Feedback -->
+      <div class="bottom-right">
         <!-- Recording Controls -->
-        <div class="section controls-section">
-          <h2 class="section-title">Recording Controls</h2>
-          <div class="button-group">
-            <button onclick="startRecording()" id="record-btn" class="btn-primary btn-record">
-              <span class="btn-icon">🎤</span>
-              Start Recording Answer
-            </button>
-            <button onclick="stopRecording()" id="stop-btn" class="btn-danger btn-stop hidden">
-              <span class="btn-icon">⏹</span>
-              Stop & Analyze
-            </button>
-          </div>
-          <div id="recording-timer" class="timer hidden">
-            <span class="timer-icon">⏱</span>
-            <span id="timer-display">00:00</span>
+        <div class="controls-section">
+          <div class="section">
+            <div class="section-header">
+              <h2 class="section-title">Recording Controls</h2>
+            </div>
+            <div class="button-group">
+              <button onclick="startRecording()" id="record-btn" class="btn-primary btn-record">
+                <span class="btn-icon">🎤</span>
+                Start Recording Answer
+              </button>
+              <button onclick="stopRecording()" id="stop-btn" class="btn-danger btn-stop hidden">
+                <span class="btn-icon">⏹</span>
+                Stop & Analyze
+              </button>
+            </div>
+            <div id="recording-timer" class="timer hidden">
+              <span class="timer-icon">⏱</span>
+              <span id="timer-display">00:00</span>
+            </div>
           </div>
         </div>
 
