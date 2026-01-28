@@ -142,58 +142,64 @@ def evaluate():
 
     # Build comprehensive evaluation prompt
     prompt = f"""
-    You are an expert interview coach providing detailed feedback.
-    
-    STRUCTURED INTERVIEW SESSION DATA:
-    Session ID: {structured_payload['session_id']}
-    Topic: {structured_payload['topic']}
-    Difficulty Level: {structured_payload['difficulty_level']}
-    Timestamp: {structured_payload['timestamp']}
-    
-    INTERVIEW QUESTION:
-    {structured_payload['question_text']}
-    
-    CANDIDATE'S ANSWER (Speech-to-Text):
-    {structured_payload['user_transcription']}
-    
-    POSTURE & BODY LANGUAGE DATA:
-    - Duration: {structured_payload['posture_data']['duration']} seconds
-    - Stability: {structured_payload['posture_data']['stability']}
-    - Notes: {structured_payload['posture_data']['notes']}
-    
-    Please provide structured feedback in the following format:
-    
-    ## Overall Assessment
-    [Provide a brief overall evaluation - 2-3 sentences]
-    
-    ## Content Analysis (Answer Quality)
-    - Relevance: [How well did they address the question?]
-    - Depth: [Did they provide sufficient detail and examples?]
-    - Structure: [Was the answer well-organized?]
-    
-    ## Communication Skills
-    - Clarity: [Was the answer clear and easy to understand?]
-    - Confidence: [Based on word choice and phrasing]
-    - Professionalism: [Appropriate language and tone?]
-    
-    ## Body Language & Posture
-    - Stability: [Comment on their physical presence]
-    - Engagement: [Based on duration and consistency]
-    
-    ## Strengths
-    [List 2-3 specific things they did well]
-    
-    ## Areas for Improvement
-    [List 2-3 specific suggestions for improvement]
-    
-    ## Score: [X]/10
-    
-    ## Final Recommendation
-    [One sentence summary and encouragement]
-    ##Answer in markdown format.
-    return actual answer of question which HR expects.
-    Answer the question in Candidate style that HR except
-    """
+        You are an expert interview coach providing detailed, professional feedback.
+
+        STRUCTURED INTERVIEW SESSION DATA:
+        Session ID: {structured_payload['session_id']}
+        Topic: {structured_payload['topic']}
+        Difficulty Level: {structured_payload['difficulty_level']}
+        Timestamp: {structured_payload['timestamp']}
+
+        INTERVIEW QUESTION:
+        {structured_payload['question_text']}
+
+        CANDIDATE'S ANSWER (Speech-to-Text):
+        {structured_payload['user_transcription']}
+
+        POSTURE & BODY LANGUAGE DATA:
+        - Duration: {structured_payload['posture_data']['duration']} seconds
+        - Stability: {structured_payload['posture_data']['stability']}
+        - Notes: {structured_payload['posture_data']['notes']}
+
+        Please provide structured feedback in the following format:
+
+        ## Interview Question (Restated)
+        [Clearly restate the interview question]
+
+        ## Overall Assessment
+        [Provide a brief overall evaluation – 2–3 sentences]
+
+        ## Content Analysis (Answer Quality)
+        - Relevance: [How well did they address the question?]
+        - Depth: [Did they provide sufficient detail and examples?]
+        - Structure: [Was the answer well-organized?]
+
+        ## Communication Skills
+        - Clarity: [Was the answer clear and easy to understand?]
+        - Confidence: [Based on word choice and phrasing]
+        - Professionalism: [Appropriate language and tone?]
+
+        ## Body Language & Posture
+        - Stability: [Comment on their physical presence]
+        - Engagement: [Based on duration and consistency]
+
+        ## Strengths
+        [List 2–3 specific things they did well]
+
+        ## Areas for Improvement
+        [List 2–3 specific suggestions for improvement]
+
+        ## Score
+        [X]/10
+
+        ## Ideal HR-Expected Answer
+        [Return the ideal answer to the interview question as HR expects.
+        Write it in a professional candidate style.]
+
+        ## Final Recommendation
+        [One-sentence summary and encouragement]
+        """
+
 
     try:
         result = llm.invoke(prompt)
