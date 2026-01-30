@@ -620,3 +620,44 @@ button {
   display: none !important;
 }
 
+/* ============================================================
+   AUTH TABS
+   ============================================================ */
+
+.auth-tabs {
+  display: flex;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.tab {
+  flex: 1;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.tab.active {
+  background: linear-gradient(135deg, var(--navy-secondary), var(--navy-primary));
+  color: var(--text-primary);
+}
+
+/* Messages */
+#msg {
+  margin-top: 16px;
+  font-size: 0.9em;
+}
+
+#msg.success {
+  color: var(--success);
+}
+
+#msg.error {
+  color: var(--danger);
+}

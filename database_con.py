@@ -18,12 +18,12 @@ def test_db(query):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        data=cursor.execute(query)
-        db_name = cursor.fetchone()
+        cursor.execute(query)  
+        data = cursor.fetchall()  
         cursor.close()
         conn.close()
-        return f"Connected to database: {db_name[0]}, data:{data}"
+        return f"Connected successfully, data: {data}"
     except Exception as e:
         return str(e)
 if __name__=="__main__":
-    print(test_db('SELECT * FROM interview_sessions WHERE user_id = 1;'))
+    print(test_db('SELECT * FROM interview_sessions WHERE user_id = 1'))

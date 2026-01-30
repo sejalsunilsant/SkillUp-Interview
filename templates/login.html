@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SkillUp Auth</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="login-wrapper">
+  <div class="login-card">
+
+    <!-- TOGGLE -->
+    <div class="auth-tabs">
+      <button class="tab active" onclick="showLogin()">Login</button>
+      <button class="tab" onclick="showRegister()">Register</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="login-box">
+      <h2>Welcome Back</h2>
+      <p class="login-subtitle">Login to SkillUp</p>
+
+      <input type="email" id="login-email" placeholder="Email">
+      <input type="password" id="login-password" placeholder="Password">
+
+      <button class="btn-primary btn-large" onclick="login()">Login</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="register-box" class="hidden">
+      <h2>Create Account</h2>
+      <p class="login-subtitle">Join SkillUp 🚀</p>
+
+      <input type="text" id="reg-name" placeholder="Full Name">
+      <input type="email" id="reg-email" placeholder="Email">
+      <input type="password" id="reg-password" placeholder="Password">
+      <input type="password" id="reg-confirm" placeholder="Confirm Password">
+
+      <button class="btn-primary btn-large" onclick="register()">Register</button>
+    </div>
+
+    <p id="msg"></p>
+
+  </div>
+</div>
+
+<script src='/static/js/login.js'></script>
+
+</body>
+</html>
