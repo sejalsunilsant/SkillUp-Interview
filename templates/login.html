@@ -2,50 +2,462 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkillUp Auth</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Reset / base ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #0d0d1a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* dot-grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, #2a2a4a 1px, transparent 1px);
+      background-size: 32px 32px;
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    /* purple glow blob */
+    body::after {
+      content: '';
+      position: fixed;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(108,99,255,0.11) 0%, transparent 70%);
+      top: -100px; left: -80px;
+      pointer-events: none;
+      animation: blobDrift 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes blobDrift {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(70px,50px) scale(1.15); }
+    }
+
+    /* ── Split-panel wrapper ──────────────────────── */
+    .login-wrapper {
+      position: relative;
+      z-index: 1;
+      width: min(960px, 96vw);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 20px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      overflow: hidden;
+      animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── LEFT: card (form side) ───────────────────── */
+    .login-card {
+      padding: 52px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 580px;
+      /* neutralise old inline styles */
+      margin: 0 !important;
+      border-radius: 0 !important;
+      text-align: left !important;
+    }
+
+    /* Brand row */
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+    .brand-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #6c63ff, #48cfad);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+    }
+    .brand-name {
+      font-family: 'Sora', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6c63ff, #48cfad);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── Tabs ─────────────────────────────────────── */
+    .auth-tabs {
+      display: flex;
+      background: #12122a;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 4px;
+      margin-bottom: 28px;
+      width: fit-content;
+    }
+
+    .tab {
+      padding: 8px 28px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Sora', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      background: transparent;
+      color: #8888aa;
+      transition: background 0.2s, color 0.2s;
+    }
+    .tab.active {
+      background: linear-gradient(135deg, #6c63ff, #48cfad);
+      color: #fff;
+    }
+
+    /* ── Form headings ────────────────────────────── */
+    #login-box h2,
+    #register-box h2 {
+      font-family: 'Sora', sans-serif;
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: #eeeeff;
+      margin-bottom: 4px;
+    }
+
+    .login-subtitle {
+      font-size: 0.88rem;
+      color: #8888aa;
+      margin-bottom: 22px;
+    }
+
+    /* ── Labels ───────────────────────────────────── */
+    label {
+      display: block;
+      font-size: 0.76rem;
+      font-weight: 500;
+      color: #8888aa;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    /* ── Input icon wrapper ───────────────────────── */
+    .input-wrap {
+      position: relative;
+      margin-bottom: 14px;
+    }
+    .input-wrap .ico {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.82rem;
+      color: #44446a;
+      pointer-events: none;
+      transition: color 0.2s;
+    }
+    .input-wrap:focus-within .ico { color: #6c63ff; }
+
+    /* ── Inputs ───────────────────────────────────── */
+    .input {
+      width: 100%;
+      background: #0f0f22 !important;
+      border: 1px solid #2a2a4a !important;
+      border-radius: 6px !important;
+      padding: 11px 14px 11px 38px !important;
+      font-family: 'DM Sans', sans-serif !important;
+      font-size: 0.88rem !important;
+      color: #eeeeff !important;
+      outline: none !important;
+      display: block;
+      margin-bottom: 0 !important;
+      margin-top: 0 !important;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input::placeholder { color: #44446a !important; }
+    .input:focus {
+      border-color: #6c63ff !important;
+      box-shadow: 0 0 0 3px rgba(108,99,255,0.15) !important;
+    }
+
+    /* ── Primary button ───────────────────────────── */
+    .btn-primary.btn-large {
+      width: 100%;
+      padding: 13px !important;
+      background: linear-gradient(135deg, #6c63ff, #48cfad) !important;
+      border: none !important;
+      border-radius: 6px !important;
+      font-family: 'Sora', sans-serif !important;
+      font-size: 0.88rem !important;
+      font-weight: 600 !important;
+      color: #fff !important;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(108,99,255,0.35);
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      margin-top: 8px !important;
+      display: block;
+    }
+    .btn-primary.btn-large:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 12px 32px rgba(108,99,255,0.45);
+    }
+    .btn-primary.btn-large:active { transform: translateY(0); }
+
+    /* ── Message ──────────────────────────────────── */
+    #msg {
+      margin-top: 14px;
+      font-size: 0.82rem;
+      color: #ff6b6b;
+      min-height: 20px;
+      text-align: center;
+    }
+    #msg.success { color: #48cfad; }
+
+    /* hidden util */
+    .hidden { display: none !important; }
+
+    /* ── RIGHT: visual panel ──────────────────────── */
+    .visual-panel {
+      background: linear-gradient(145deg, #1a1a3a 0%, #0d0d22 100%);
+      border-left: 1px solid #2a2a4a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    .visual-panel::before {
+      content: '';
+      position: absolute;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(72,207,173,0.09) 0%, transparent 70%);
+      bottom: -80px; right: -60px;
+      pointer-events: none;
+    }
+
+    /* "Already a member? LOGIN" row */
+    .switch-row {
+      position: absolute;
+      top: 22px; right: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .switch-row span {
+      font-size: 0.8rem;
+      color: #8888aa;
+    }
+    .btn-switch {
+      padding: 7px 20px;
+      background: transparent;
+      border: 1.5px solid #6c63ff;
+      border-radius: 6px;
+      font-family: 'Sora', sans-serif;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #6c63ff;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-switch:hover { background: #6c63ff; color: #fff; }
+
+    /* illustration */
+    .illustration {
+      width: 100%;
+      max-width: 300px;
+      animation: floatIll 6s ease-in-out infinite;
+      position: relative; z-index: 1;
+    }
+    @keyframes floatIll {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-10px); }
+    }
+
+    .visual-tagline {
+      text-align: center;
+      margin-top: 24px;
+      position: relative; z-index: 1;
+    }
+    .visual-tagline h3 {
+      font-family: 'Sora', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #eeeeff;
+      margin-bottom: 7px;
+    }
+    .visual-tagline p {
+      font-size: 0.8rem;
+      color: #8888aa;
+      line-height: 1.6;
+      max-width: 210px;
+      margin: 0 auto;
+    }
+
+    /* ── Responsive ───────────────────────────────── */
+    @media (max-width: 700px) {
+      .login-wrapper { grid-template-columns: 1fr; }
+      .visual-panel  { display: none; }
+      .login-card    { padding: 40px 28px; }
+    }
+  </style>
 </head>
 <body>
 
 <div class="login-wrapper">
+
+  <!-- ═══════════ LEFT: FORM ═══════════ -->
   <div class="login-card">
 
-    <!-- TOGGLE -->
-    <div class="auth-tabs">
-      <button class="tab active" onclick="showLogin()">Login</button>
-      <button class="tab" onclick="showRegister()">Register</button>
+    <div class="brand-row">
+      <div class="brand-icon">🎯</div>
+      <span class="brand-name">SkillUp</span>
     </div>
 
-    <!-- LOGIN -->
+    <!-- TOGGLE — same onclick hooks as original -->
+    <div class="auth-tabs">
+      <button class="tab active" onclick="showLogin()">Login</button>
+      <button class="tab"        onclick="showRegister()">Register</button>
+    </div>
+
+    <!-- LOGIN — same id="login-box", same field IDs -->
     <div id="login-box">
       <h2>Welcome Back</h2>
       <p class="login-subtitle">Login to SkillUp</p>
 
-      <input type="email" id="login-email" placeholder="Email">
-      <input type="password" id="login-password" placeholder="Password">
+      <label for="login-email">Email</label>
+      <div class="input-wrap">
 
-      <button class="btn-primary btn-large" onclick="login()">Login</button>
+        <input type="email" id="login-email" class="input"
+               placeholder="john@gmail.com" autocomplete="email">
+      </div>
+
+      <label for="login-password">Password</label>
+      <div class="input-wrap">
+        <input type="password" id="login-password" class="input"
+               placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <!-- same onclick="login()" as original -->
+      <button class="btn-primary btn-large" onclick="login()">LOGIN</button>
     </div>
 
-    <!-- REGISTER -->
+    <!-- REGISTER — same id="register-box", same field IDs -->
     <div id="register-box" class="hidden">
       <h2>Create Account</h2>
-      <p class="login-subtitle">Join SkillUp 🚀</p>
+      <p class="login-subtitle">Join SkillUp </p>
 
-      <input type="text" id="reg-name" placeholder="Full Name">
-      <input type="email" id="reg-email" placeholder="Email">
-      <input type="password" id="reg-password" placeholder="Password">
-      <input type="password" id="reg-confirm" placeholder="Confirm Password">
+      <label for="reg-name">Full Name</label>
+      <div class="input-wrap">
+        <input type="text" id="reg-name" class="input" placeholder="Full Name">
+      </div>
 
-      <button class="btn-primary btn-large" onclick="register()">Register</button>
+      <label for="reg-email">Email</label>
+      <div class="input-wrap">
+        
+        <input type="email" id="reg-email" class="input" placeholder="Email">
+      </div>
+
+      <label for="reg-password">Password</label>
+      <div class="input-wrap">
+        
+        <input type="password" id="reg-password" class="input" placeholder="Password">
+      </div>
+
+      <label for="reg-confirm">Confirm Password</label>
+      <div class="input-wrap">
+        
+        <input type="password" id="reg-confirm" class="input" placeholder="Confirm Password">
+      </div>
+
+      <!-- same onclick="register()" as original -->
+      <button class="btn-primary btn-large" onclick="register()">REGISTER</button>
     </div>
 
+    <!-- same id="msg" read by login.js -->
     <p id="msg"></p>
 
-  </div>
-</div>
+  </div><!-- /.login-card -->
+
+
+  <!-- ═══════════ RIGHT: VISUAL PANEL ═══════════ -->
+  <div class="visual-panel">
+
+    <!-- mirrors screenshot "Already a member? LOGIN" -->
+    <div class="switch-row">
+      <span id="switch-label">New here?</span>
+      <button class="btn-switch" id="switch-btn" onclick="handlePanelSwitch()">REGISTER</button>
+    </div>
+
+
+    <img src="/static/images/loginperson.png" class="illustration" alt="Interview illustration" style="width:100%;max-width:320px;position:relative;z-index:1;animation:floatIll 6s ease-in-out infinite;border-radius: 20px;">
+
+    <div class="visual-tagline">
+      <h3>Practice Makes Perfect</h3>
+      <p>AI-powered mock interviews with real-time emotion coaching</p>
+    </div>
+
+  </div><!-- /.visual-panel -->
+
+</div><!-- /.login-wrapper -->
 
 <script src='/static/js/login.js'></script>
+
+<script>
+
+
+  function showLogin() {
+    document.getElementById('login-box').classList.remove('hidden');
+    document.getElementById('register-box').classList.add('hidden');
+    document.querySelectorAll('.tab')[0].classList.add('active');
+    document.querySelectorAll('.tab')[1].classList.remove('active');
+    document.getElementById('switch-label').textContent = 'New here?';
+    document.getElementById('switch-btn').textContent   = 'REGISTER';
+    document.getElementById('msg').textContent = '';
+  }
+
+  function showRegister() {
+    document.getElementById('register-box').classList.remove('hidden');
+    document.getElementById('login-box').classList.add('hidden');
+    document.querySelectorAll('.tab')[1].classList.add('active');
+    document.querySelectorAll('.tab')[0].classList.remove('active');
+    document.getElementById('switch-label').textContent = 'Already a member?';
+    document.getElementById('switch-btn').textContent   = 'LOGIN';
+    document.getElementById('msg').textContent = '';
+  }
+
+  /* right-panel button toggles between the two views */
+  function handlePanelSwitch() {
+    const loginHidden = document.getElementById('login-box').classList.contains('hidden');
+    if (loginHidden) showLogin(); else showRegister();
+  }
+</script>
 
 </body>
 </html>

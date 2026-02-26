@@ -1,21 +1,6 @@
-"""
-app.py  –  SkillUp Interview Platform
-=======================================
-Updated to use Python-side real-time emotion detection (EmotionDetector)
-instead of the JavaScript posture heuristic.
-
-Key changes vs original:
-  • /start-session  → starts the EmotionDetector background thread
-  • /emotion-status → live polling endpoint (replaces JS posture polling)
-  • /evaluate       → calls detector.get_session_summary() for posture_data
-  • /stop-session   → stops the detector cleanly
-"""
-
-# Silence TF/oneDNN logs before any TF import
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from flask_cors import CORS
 from langchain_groq import ChatGroq
@@ -24,12 +9,14 @@ from datetime import datetime
 import uuid
 import bcrypt
 from functools import wraps
+from langchain.chat_models import init_chat_model
+from Services.Genrator import InterviewGenratSession
 
-# ── Emotion Detector ──────────────────────────────────────────────────────────
+# ── Emotion Detector ────────────
 from emotion_detector import EmotionDetector
 
-# ── DB helper (unchanged) ─────────────────────────────────────────────────────
-from database_con import get_db_connection
+# ── DB helper (unchanged)
+from database_con import get_db_connection,StoreSession
 
 load_dotenv()
 
@@ -38,15 +25,21 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "skillup_secret_key")
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
+llm_service=InterviewGenratSession()
 llm = ChatGroq(
     groq_api_key=os.getenv("groq_Api"),
     model_name="llama-3.1-8b-instant",
     temperature=0.7,
-)
+) #as it  required net connection
+# llm = init_chat_model(
+#     model="phi-3.1-mini-4k-instruct",
+#     model_provider="openai",
+#     base_url="http://127.0.0.1:1234/v1",
+#     api_key="not-needed"
+# )
 
 # ── Global emotion detector instance ─────────────────────────────────────────
-#    One detector is shared across all interview sessions on this server.
-#    For multi-user production deployments, move this into a per-session object.
+
 emotion_detector: EmotionDetector = EmotionDetector(   
     smooth_window=10,
     min_confidence=0.40,
@@ -206,7 +199,7 @@ def start_session():
 
 
 # ============================================================
-# NEW ► LIVE EMOTION STATUS  (replaces JS posture polling)
+# NEW ► LIVE EMOTION STATUS 
 # ============================================================
 @app.route("/emotion-status", methods=["GET"])
 def emotion_status():
@@ -226,7 +219,7 @@ def emotion_status():
     data = emotion_detector.get_current_emotion()
     return jsonify({
         "emotion":           data["emotion"],
-        "confidence":        round(data["confidence"] * 100, 1),   # % for display
+        "confidence":        round(data["confidence"] * 100, 1), 
         "face_detected":     data["face_detected"],
         "stability":         data["stability"],
         "dominant_emotion":  data.get("dominant_emotion", "N/A"),
@@ -262,32 +255,21 @@ def hr_questions():
     count      = data.get("count", 1)
     topic      = data.get("topic", "Technical")
 
-    prompt = f"""
-    You are an experienced HR interviewer conducting a {level}-level interview.
-    Generate {count} {level}-level interview question related to: {topic}
-    The question should assess practical application related to the topic.
-    Return ONLY the question text, nothing else.
-    """
-
     try:
-        result   = llm.invoke(prompt)
-        question = result.content if hasattr(result, "content") else str(result)
-
+        question = llm_service.Genrat_hr_questions(level,count,topic)
         interview_session = InterviewSession(
-            question_text=question.strip(),
-            topic=topic,
-            difficulty_level=level,
-        )
+                question_text=question,
+                topic=topic,
+                difficulty_level=level,
+            )
         sessions[interview_session.session_id] = interview_session
-
         return jsonify({
-            "session_id":       interview_session.session_id,
-            "question":         interview_session.question_text,
-            "topic":            interview_session.topic,
-            "difficulty_level": interview_session.difficulty_level,
-            "timestamp":        interview_session.timestamp,
-        })
-
+                "session_id":       interview_session.session_id,
+                "question":         interview_session.question_text,
+                "topic":            interview_session.topic,
+                "difficulty_level": interview_session.difficulty_level,
+                "timestamp":        interview_session.timestamp,
+            })
     except Exception as e:
         print("HR QUESTIONS ERROR:", e)
         return jsonify({"error": str(e)}), 500
@@ -298,15 +280,9 @@ def hr_questions():
 # ============================================================
 @app.route("/evaluate", methods=["POST"])
 def evaluate():
-    """
-    Context-aware evaluation using complete session + emotion data.
-    posture_data is now supplied by the Python EmotionDetector,
-    but the frontend can still send its own posture_data as override/fallback.
-    """
     data        = request.json
     session_id  = data.get("session_id")
     transcript  = data.get("transcript", "")
-    # Frontend posture_data is accepted as a fallback
     frontend_posture = data.get("posture_data", {})
 
     if not transcript.strip():
@@ -346,90 +322,31 @@ def evaluate():
             "duration":         emotion_summary.get("duration", 0),
             "stability":        emotion_summary.get("stability", "Unknown"),
             "notes":            emotion_summary.get("notes", "Not available"),
-            # NEW emotion fields
             "current_emotion":  emotion_summary.get("emotion", "Unknown"),
             "dominant_emotion": emotion_summary.get("dominant_emotion", "Unknown"),
             "emotion_summary":  emotion_summary.get("emotion_summary", {}),
         },
     }
-
-    # ── Evaluation prompt (enriched with emotion context) ─────────────────────
-    emotion_section = ""
-    if emotion_summary.get("emotion_summary"):
-        breakdown = ", ".join(
-            f"{e}: {p}%" for e, p in emotion_summary["emotion_summary"].items()
-        )
-        emotion_section = f"- Emotion Breakdown: {breakdown}"
-
-    prompt = f"""
-        You are an expert interview coach providing detailed, professional feedback.
-
-        STRUCTURED INTERVIEW SESSION DATA:
-        Session ID: {structured_payload['session_id']}
-        Topic: {structured_payload['topic']}
-        Difficulty Level: {structured_payload['difficulty_level']}
-        Timestamp: {structured_payload['timestamp']}
-
-        INTERVIEW QUESTION:
-        {structured_payload['question_text']}
-
-        CANDIDATE'S ANSWER (Speech-to-Text):
-        {structured_payload['user_transcription']}
-
-        POSTURE & EMOTION DATA (detected by Python AI):
-        - Duration: {structured_payload['posture_data']['duration']} seconds
-        - Stability: {structured_payload['posture_data']['stability']}
-        - Current Emotion: {structured_payload['posture_data']['current_emotion']}
-        - Dominant Emotion: {structured_payload['posture_data']['dominant_emotion']}
-        {emotion_section}
-        - Notes: {structured_payload['posture_data']['notes']}
-
-        Please provide structured feedback in the following format:
-
-        ## Interview Question (Restated)
-        [Clearly restate the interview question]
-
-        ## Overall Assessment
-        [Provide a brief overall evaluation – 2–3 sentences]
-
-        ## Content Analysis (Answer Quality)
-        - Relevance: [How well did they address the question?]
-        - Depth: [Did they provide sufficient detail and examples?]
-        - Structure: [Was the answer well-organized?]
-
-        ## Communication Skills
-        - Clarity: [Was the answer clear and easy to understand?]
-        - Confidence: [Based on word choice and phrasing]
-        - Professionalism: [Appropriate language and tone?]
-
-        ## Emotional Presence & Body Language
-        - Dominant Emotion Detected: [{structured_payload['posture_data']['dominant_emotion']}]
-        - Stability: [Comment on their emotional consistency during the interview]
-        - Engagement: [Based on duration and emotional range detected]
-        - Coaching Tip: [One specific tip based on their detected emotions]
-
-        ## Strengths
-        [List 2–3 specific things they did well]
-
-        ## Areas for Improvement
-        [List 2–3 specific suggestions for improvement]
-
-        ## Score
-        [X]/10
-
-        ## Ideal HR-Expected Answer
-        [Return the ideal answer to the interview question as HR expects.
-        Write it in a professional candidate style.]
-
-        ## Final Recommendation
-        [One-sentence summary and encouragement]
-        """
-
     try:
-        result   = llm.invoke(prompt)
-        feedback = result.content if hasattr(result, "content") else str(result)
-
+        feedback= llm_service.evaluate_Answer(structured_payload)
         interview_session.feedback = feedback
+
+        score = feedback.get("score", 0) if isinstance(feedback, dict) else 0
+
+        # Prepare DB data
+        db_data = {
+            "session_id": interview_session.session_id,
+            "user_id": session.get("user_id"),
+            "topic": interview_session.topic,
+            "question": interview_session.question_text,
+            "answer": transcript,
+            "score": score,
+            "feedback": str(feedback),
+            "session_date": datetime.now()
+        }
+
+        # Store in database
+        StoreSession(db_data)
 
         return jsonify({
             "session_id":   interview_session.session_id,
@@ -438,7 +355,7 @@ def evaluate():
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error in app": str(e)}), 500
 
 
 # ============================================================

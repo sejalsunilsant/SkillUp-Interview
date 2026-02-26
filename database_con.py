@@ -13,6 +13,49 @@ def get_db_connection():
         database="interview_tracker"
     )
 
+ 
+def StoreSession(session_data):
+    """
+    Stores interview session data in MySQL database
+    """
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        query = """
+        INSERT INTO interview_sessions
+        (session_id, user_id, topic, question, answer, score, feedback, session_date)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+
+        values = (
+            session_data["session_id"],
+            session_data["user_id"],
+            session_data["topic"],
+            session_data["question"],
+            session_data["answer"],
+            session_data["score"],
+            session_data["feedback"],
+            session_data["session_date"]
+        )
+
+        cursor.execute(query, values)
+
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+        print("Data Stored")
+
+        return True
+
+    except Exception as e:
+        print("DB ERROR:", e)
+        return False
+
+
+
 @app.route("/test-db")
 def test_db(query):
     try:
