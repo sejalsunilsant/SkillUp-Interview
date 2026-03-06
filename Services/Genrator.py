@@ -11,17 +11,17 @@ load_dotenv()
 
 class InterviewGenratSession:
     def __init__(self):
-        self.llm = ChatGroq(
-            groq_api_key=os.getenv("groq_Api"),
-            model_name="llama-3.1-8b-instant",
-            temperature=0.7,
-        ) #as it  required net connection
-        # llm = init_chat_model(
-        #     model="phi-3.1-mini-4k-instruct",
-        #     model_provider="openai",
-        #     base_url="http://127.0.0.1:1234/v1",
-        #     api_key="not-needed"
-        # )  
+        # self.llm = ChatGroq(
+        #     groq_api_key=os.getenv("groq_Api"),
+        #     model_name="llama-3.1-8b-instant",
+        #     temperature=0.7,
+        # ) #as it  required net connection
+        self.llm = init_chat_model(
+            model="phi-3.1-mini-4k-instruct",
+            model_provider="openai",
+            base_url="http://127.0.0.1:1234/v1",
+            api_key="not-needed"
+        )  
     def Genrat_hr_questions(self,level="easy",count=1,topic="Technical"):
 
         prompt = f"""
