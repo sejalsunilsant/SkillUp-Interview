@@ -17,6 +17,8 @@ from emotion_detector import EmotionDetector
 
 # ── DB helper (unchanged)
 from database_con import get_db_connection,StoreSession
+import io
+import PyPDF2
 
 load_dotenv()
 
@@ -103,6 +105,12 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+@app.route("/check-login")
+def check_login():
+    if "user_id" in session:
+        return {"logged_in": True}
+    else:
+        return {"logged_in": False}
 
 # ============================================================
 # AUTH ROUTES  (unchanged)
@@ -176,7 +184,12 @@ def logout():
 @app.route("/interview")
 @login_required
 def interview_page():
-    return render_template("interview.html")
+    return render_template("interview.html", active_page='interview')
+
+@app.route("/dashboard")
+@login_required
+def dashboard_page():
+    return render_template("Dashboard.html", active_page='dashboard')
 
 
 # ============================================================
@@ -245,24 +258,86 @@ def detect_emotion():
     result = emotion_detector.process_frame(frame)
 
     return jsonify(result)
+# Progress dashboard
+@app.route("/progress-dashboard",methods=["GET"])
+@login_required
+def progress_dash():
+    user_id=session.get("user_id")
+    user_name=session.get("name","user")
+    return render_template("Progress.html",user_id=user_id,user_name=user_name, active_page='progress')
+# Get user sessions
+@app.route("/get-user-sessions",methods=["GET"])
+@login_required
+def get_user_session():
+    user_id=session.get("user_id")
+    conn=get_db_connection()
+    cursor=conn.cursor(dictionary=True)
+    cursor.execute("""
+        select topic,score,feedback,session_date
+        from interview_sessions where user_id=%s
+        order by session_date desc
+    """,(user_id,))
+    sessions=cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return jsonify(sessions)
 # ============================================================
-# STEP 1: Generate HR Question & Create Session  (unchanged)
+# STEP 1: Generate HR Question & Create Session
 # ============================================================
 @app.route("/hr-questions", methods=["POST"])
 def hr_questions():
-    data       = request.json
-    level      = data.get("level", "easy")
-    count      = data.get("count", 1)
-    topic      = data.get("topic", "Technical")
+    # We now handle multipart/form-data or JSON
+    if request.is_json:
+        data = request.json
+        level = data.get("level", "easy")
+        jd_text = data.get("jd", "")
+        resume_text = data.get("resume_text", "")
+    else:
+        # Multipart form data (for file upload)
+        level = request.form.get("level", "easy")
+        jd_text = request.form.get("jd", "")
+        resume_text = ""
+        
+        # Check for resume file
+        if 'resume' in request.files:
+            file = request.files['resume']
+            if file and file.filename.endswith('.pdf'):
+                try:
+                    pdf_reader = PyPDF2.PdfReader(io.BytesIO(file.read()))
+                    for page in pdf_reader.pages:
+                        resume_text += page.extract_text() + "\n"
+                except Exception as e:
+                    print("PDF extract error:", e)
+            elif file:
+                # Assume text if not PDF
+                resume_text = file.read().decode('utf-8', errors='ignore')
+
+    # Store JD and Resume text in flask session for follow-up questions
+    if jd_text:
+        session["jd_text"] = jd_text
+    if resume_text:
+        session["resume_text"] = resume_text
+
+    # Use stored JD/Resume if not provided in current request
+    final_jd = jd_text or session.get("jd_text", "")
+    final_resume = resume_text or session.get("resume_text", "")
 
     try:
-        question = llm_service.Genrat_hr_questions(level,count,topic)
+        # Generate question using JD and Resume
+        question = llm_service.Genrat_hr_questions(
+            level=level, 
+            count=1, 
+            jd_text=final_jd, 
+            resume_text=final_resume
+        )
+        
         interview_session = InterviewSession(
                 question_text=question,
-                topic=topic,
+                topic="JD-Based",
                 difficulty_level=level,
             )
         sessions[interview_session.session_id] = interview_session
+        
         return jsonify({
                 "session_id":       interview_session.session_id,
                 "question":         interview_session.question_text,
@@ -328,20 +403,29 @@ def evaluate():
         },
     }
     try:
-        feedback= llm_service.evaluate_Answer(structured_payload)
+        feedback = llm_service.evaluate_Answer(structured_payload)
         interview_session.feedback = feedback
 
-        score = feedback.get("score", 0) if isinstance(feedback, dict) else 0
+        # Extract score from feedback string (e.g., "7/10")
+        import re
+        score_match = re.search(r"## Score\s*(\d+)/10", feedback)
+        score = int(score_match.group(1)) if score_match else 0
+        
+        # Determine topic: use JD snippet or default
+        db_topic = interview_session.topic
+        if session.get("jd_text"):
+            # Use first 30 chars of JD as topic context
+            db_topic = f"JD: {session.get('jd_text')[:30]}..."
 
         # Prepare DB data
         db_data = {
             "session_id": interview_session.session_id,
             "user_id": session.get("user_id"),
-            "topic": interview_session.topic,
+            "topic": db_topic,
             "question": interview_session.question_text,
             "answer": transcript,
             "score": score,
-            "feedback": str(feedback),
+            "feedback": feedback,
             "session_date": datetime.now()
         }
 

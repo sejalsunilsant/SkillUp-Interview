@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkillUp Interview</title>
   <link rel="stylesheet" href='/static/css/style.css'>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <style>
     /* ── Emotion Panel Styles ── */
     .emotion-panel {
@@ -59,152 +60,196 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <h1>SkillUp Interview</h1>
-      <p class="subtitle">Professional interview simulation with AI-powered feedback</p>
-    </header>
-
-    <!-- Interview Setup Section -->
-    <div id="setup-section" class="section">
-      <h2 class="section-title">Configure Your Interview</h2>
-      <div class="setup-grid">
-        <div class="input-group">
-          <label for="topic-input">Interview Topic</label>
-          <input type="text" id="topic-input"
-                 placeholder="e.g., Technical, Behavioral, Leadership"
-                 value="Technical">
-        </div>
-        <div class="input-group">
-          <label for="difficulty-select">Difficulty Level</label>
-          <select id="difficulty-select">
-            <option value="easy">Easy</option>
-            <option value="medium" selected>Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
-        <button onclick="startInterview()" class="btn-primary btn-large">
-          <span class="btn-icon">▶</span>
-          Start Interview
-        </button>
+  <div class="app-wrapper">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon"><i class="ph-bold ph-target"></i></div>
+        <span class="logo-text">SkillUp</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item {{ 'active' if active_page == 'dashboard' }}">
+          <i class="ph-bold ph-house nav-icon"></i>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="/interview" class="nav-item {{ 'active' if active_page == 'interview' }}">
+          <i class="ph-bold ph-user nav-icon"></i>
+          <span class="nav-text">Interview</span>
+        </a>
+        <a href="/progress-dashboard" class="nav-item {{ 'active' if active_page == 'progress' }}">
+          <i class="ph-bold ph-chart-bar nav-icon"></i>
+          <span class="nav-text">Progress</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/logout" class="nav-item" style="color: var(--danger);">
+          <i class="ph-bold ph-sign-out nav-icon"></i>
+          <span class="nav-text">Logout</span>
+        </a>
       </div>
     </div>
 
-    <!-- Main Interview Grid -->
-    <div class="main-grid hidden" id="main-grid">
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="container">
+        <header class="header">
+          <h1>SkillUp Interview</h1>
+          <p class="subtitle">Professional interview simulation with AI-powered feedback</p>
+        </header>
 
-      <!-- TOP-LEFT: Video -->
-      <div class="top-left">
-        <div class="section video-section">
-          <div class="section-header">
-            <h2 class="section-title">Live Video</h2>
-            <div id="posture-status" class="status-badge status-inactive">Camera Inactive</div>
+        <!-- Interview Setup Section -->
+        <div id="setup-section" class="section">
+          <h2 class="section-title">Configure Your Interview</h2>
+          <div class="setup-grid">
+            <div class="input-group" style="grid-column: span 2;">
+              <label for="jd-input">Job Description</label>
+              <textarea id="jd-input" rows="4" 
+                     placeholder="Paste the job description here (responsibilities, requirements...)"
+                     style="width: 100%; border-radius: 8px; padding: 10px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;"></textarea>
+            </div>
+            <div class="input-group">
+              <label for="resume-input">Upload Resume (PDF)</label>
+              <input type="file" id="resume-input" accept=".pdf"
+                     style="width: 100%; border-radius: 8px; padding: 8px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;">
+            </div>
+            <div class="input-group">
+              <label for="difficulty-select">Difficulty Level</label>
+              <select id="difficulty-select">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <button onclick="startInterview()" class="btn-primary btn-large" style="grid-column: span 2;">
+              <span class="btn-icon">▶</span>
+              Start AI Interview
+            </button>
           </div>
-          <div class="video-container">
-            <video id="video" autoplay playsinline muted></video>
-            <canvas id="canvas" style="display:none;"></canvas>
-            <div class="video-overlay">
-              <div class="recording-indicator hidden" id="recording-indicator">
-                <span class="pulse"></span>
-                Recording
+        </div>
+
+        <!-- Main Interview Grid -->
+        <div class="main-grid hidden" id="main-grid">
+
+          <!-- TOP-LEFT: Video -->
+          <div class="top-left">
+            <div class="section video-section">
+              <div class="section-header">
+                <h2 class="section-title">Live Video</h2>
+                <div id="posture-status" class="status-badge status-inactive">Camera Inactive</div>
+              </div>
+              <div class="video-container">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="canvas" style="display:none;"></canvas>
+                <div class="video-overlay">
+                  <div class="recording-indicator hidden" id="recording-indicator">
+                    <span class="pulse"></span>
+                    Recording
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── NEW: Live emotion panel ── -->
+              <div class="emotion-panel">
+                <h3>🎭 Facial Expression Monitoring System Guidance:</h3>
+                <div id="emotion-panel">
+                  <p style="color:#666;font-size:0.85rem;">Waiting for detector…</p>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- ── NEW: Live emotion panel ── -->
-          <div class="emotion-panel">
-            <h3>🎭 Facial Expression Monitoring System Guidance:</h3>
-            <div id="emotion-panel">
-              <p style="color:#666;font-size:0.85rem;">Waiting for detector…</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- MIDDLE: Speech-to-Text -->
-      <div class="section transcript-section">
-        <div class="section-header">
-          <h2 class="section-title">Speech-to-Text</h2>
-          <div id="transcript-status" class="status-badge status-inactive">Ready</div>
-        </div>
-        <div id="transcript-display" class="transcript-box">
-          Click "Start Recording" to begin transcription…
-        </div>
-      </div>
-
-      <!-- TOP-RIGHT: Interview Question -->
-      <div class="top-right">
-        <div class="section question-section">
-          <h2 class="section-title">Interview Question</h2>
-          <div id="question-display" class="question-box">
-            Configuring your interview session…
-          </div>
-
-          <div class="session-info">
-            <div class="info-item">
-              <span class="info-label">Topic</span>
-              <span id="topic-display" class="info-value">Technical</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Level</span>
-              <span id="level-display" class="info-value">Medium</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Session ID</span>
-              <span id="session-display" class="info-value">-</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- BOTTOM-RIGHT: Controls + Feedback -->
-      <div class="bottom-right">
-        <div class="controls-section">
-          <div class="section">
+          <!-- MIDDLE: Speech-to-Text -->
+          <div class="section transcript-section">
             <div class="section-header">
-              <h2 class="section-title">Recording Controls</h2>
+              <h2 class="section-title">Speech-to-Text</h2>
+              <div id="transcript-status" class="status-badge status-inactive">Ready</div>
             </div>
-            <div class="button-group">
-              <button onclick="startRecording()" id="record-btn"
-                      class="btn-primary btn-record">
-                <span class="btn-icon">🎤</span>
-                Start Recording Answer
-              </button>
-              <button onclick="stopRecording()" id="stop-btn"
-                      class="btn-danger btn-stop hidden">
-                <span class="btn-icon">⏹</span>
-                Stop &amp; Analyze
-              </button>
+            <div id="transcript-display" class="transcript-box">
+              Click "Start Recording" to begin transcription…
             </div>
-            <div id="recording-timer" class="timer hidden">
-              <span class="timer-icon">⏱</span>
-              <span id="timer-display">00:00</span>
+          </div>
+
+          <!-- TOP-RIGHT: Interview Question -->
+          <div class="top-right">
+            <div class="section question-section">
+              <h2 class="section-title">Interview Question</h2>
+              <div id="question-display" class="question-box">
+                Configuring your interview session…
+              </div>
+
+              <div class="session-info">
+                <div class="info-item">
+                  <span class="info-label">Topic</span>
+                  <span id="topic-display" class="info-value">Technical</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Level</span>
+                  <span id="level-display" class="info-value">Medium</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Session ID</span>
+                  <span id="session-display" class="info-value">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM-RIGHT: Controls + Feedback -->
+          <div class="bottom-right">
+            <div class="controls-section">
+              <div class="section">
+                <div class="section-header">
+                  <h2 class="section-title">Recording Controls</h2>
+                </div>
+                <div class="button-group">
+                  <button onclick="startRecording()" id="record-btn"
+                          class="btn-primary btn-record">
+                    <span class="btn-icon">🎤</span>
+                    Start Recording Answer
+                  </button>
+                  <button onclick="stopRecording()" id="stop-btn"
+                          class="btn-danger btn-stop hidden">
+                    <span class="btn-icon">⏹</span>
+                    Stop &amp; Analyze
+                  </button>
+                </div>
+                <div id="recording-timer" class="timer hidden">
+                  <span class="timer-icon">⏱</span>
+                  <span id="timer-display">00:00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Feedback Section -->
+            <div id="feedback-section" class="section feedback-section hidden">
+              <h2 class="section-title">AI Feedback &amp; Analysis</h2>
+              <div id="feedback-display" class="feedback-box">
+                Analyzing your response…
+              </div>
+              <div class="button-group" style="margin-top: 15px;">
+                <button onclick="nextQuestion()" class="btn-primary">
+                  <span class="btn-icon">➡️</span>
+                  Next Question
+                </button>
+                <button onclick="resetInterview()" class="btn-secondary">
+                  <span class="btn-icon">🚪</span>
+                  Leave Interview
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Feedback Section -->
-        <div id="feedback-section" class="section feedback-section hidden">
-          <h2 class="section-title">AI Feedback &amp; Analysis</h2>
-          <div id="feedback-display" class="feedback-box">
-            Analyzing your response…
+        <!-- Loading Overlay -->
+        <div id="loading" class="loading-overlay hidden">
+          <div class="loading-content">
+            <div class="spinner"></div>
+            <p class="loading-text">Analyzing your response…</p>
+            <p class="loading-subtext">This may take a few moments</p>
           </div>
-          <button onclick="resetInterview()" class="btn-secondary">
-            <span class="btn-icon">🔄</span>
-            Practice Another Question
-          </button>
         </div>
       </div>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div id="loading" class="loading-overlay hidden">
-      <div class="loading-content">
-        <div class="spinner"></div>
-        <p class="loading-text">Analyzing your response…</p>
-        <p class="loading-subtext">This may take a few moments</p>
-      </div>
-    </div>
+    </main>
   </div>
 
   <script src='/static/js/script.js'></script>

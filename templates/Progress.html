@@ -4,92 +4,122 @@
   <meta charset="UTF-8" />
   <title>User Progress Dashboard</title>
   <link rel="stylesheet" href='/static/css/style.css'>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
+  <div class="app-wrapper">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon"><i class="ph-bold ph-target"></i></div>
+        <span class="logo-text">SkillUp</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item {{ 'active' if active_page == 'dashboard' }}">
+          <i class="ph-bold ph-house nav-icon"></i>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="/interview" class="nav-item {{ 'active' if active_page == 'interview' }}">
+          <i class="ph-bold ph-user nav-icon"></i>
+          <span class="nav-text">Interview</span>
+        </a>
+        <a href="/progress-dashboard" class="nav-item {{ 'active' if active_page == 'progress' }}">
+          <i class="ph-bold ph-chart-bar nav-icon"></i>
+          <span class="nav-text">Progress</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/logout" class="nav-item" style="color: var(--danger);">
+          <i class="ph-bold ph-sign-out nav-icon"></i>
+          <span class="nav-text">Logout</span>
+        </a>
+      </div>
+    </div>
 
-<div class="container">
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+          <h1>User Progress Dashboard</h1>
+          <p class="subtitle">Track your interview growth and performance</p>
+        </div>
 
-  <!-- HEADER -->
-  <div class="header">
-    <h1>User Progress Dashboard</h1>
-    <p class="subtitle">Track your interview growth and performance</p>
+        <!-- OVERVIEW CARDS -->
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Overview</h2>
+          </div>
+
+          <div class="main-grid" style="height:auto;">
+            <div class="section">
+              <span class="info-label">Total Interviews</span>
+              <h1 id="totalSessions">0</h1>
+            </div>
+
+            <div class="section">
+              <span class="info-label">Average Score</span>
+              <h1 id="avgScore">0</h1>
+            </div>
+
+            <div class="section">
+              <span class="info-label">Best Skill</span>
+              <h1 id="bestSkill">-</h1>
+            </div>
+
+            <div class="section">
+              <span class="info-label">Latest Score</span>
+              <h1 id="latestScore">-</h1>
+            </div>
+          </div>
+        </div>
+
+        <!-- SKILL PROGRESS -->
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Skill Progress</h2>
+          </div>
+
+          <div class="session-info">
+            <div class="info-item">
+              <span class="info-label">Technical</span>
+              <progress id="techSkill" max="10"></progress>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Communication</span>
+              <progress id="commSkill" max="10"></progress>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Confidence</span>
+              <progress id="confSkill" max="10"></progress>
+            </div>
+          </div>
+        </div>
+
+        <!-- RECENT SESSIONS -->
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Recent Interview Sessions</h2>
+          </div>
+
+          <div class="feedback-box">
+            <table style="width:100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Topic</th>
+                  <th>Score</th>
+                  <th>Feedback</th>
+                </tr>
+              </thead>
+              <tbody id="sessionTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
 
-  <!-- OVERVIEW CARDS -->
-  <div class="section">
-    <div class="section-header">
-      <h2 class="section-title">Overview</h2>
-    </div>
-
-    <div class="main-grid" style="height:auto;">
-      <div class="section">
-        <span class="info-label">Total Interviews</span>
-        <h1 id="totalSessions">0</h1>
-      </div>
-
-      <div class="section">
-        <span class="info-label">Average Score</span>
-        <h1 id="avgScore">0</h1>
-      </div>
-
-      <div class="section">
-        <span class="info-label">Best Skill</span>
-        <h1 id="bestSkill">-</h1>
-      </div>
-
-      <div class="section">
-        <span class="info-label">Latest Score</span>
-        <h1 id="latestScore">-</h1>
-      </div>
-    </div>
-  </div>
-
-  <!-- SKILL PROGRESS -->
-  <div class="section">
-    <div class="section-header">
-      <h2 class="section-title">Skill Progress</h2>
-    </div>
-
-    <div class="session-info">
-      <div class="info-item">
-        <span class="info-label">Technical</span>
-        <progress id="techSkill" max="10"></progress>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Communication</span>
-        <progress id="commSkill" max="10"></progress>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Confidence</span>
-        <progress id="confSkill" max="10"></progress>
-      </div>
-    </div>
-  </div>
-
-  <!-- RECENT SESSIONS -->
-  <div class="section">
-    <div class="section-header">
-      <h2 class="section-title">Recent Interview Sessions</h2>
-    </div>
-
-    <div class="feedback-box">
-      <table style="width:100%; border-collapse: collapse;">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Topic</th>
-            <th>Score</th>
-            <th>Feedback</th>
-          </tr>
-        </thead>
-        <tbody id="sessionTable"></tbody>
-      </table>
-    </div>
-  </div>
-
-</div>
-
-<script src="/static/js/progress.js"></script>
-
+  <script src="/static/js/progress.js"></script>
 </body>
 </html>

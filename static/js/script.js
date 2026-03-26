@@ -76,18 +76,14 @@ document.addEventListener("DOMContentLoaded", function () {
 // START INTERVIEW
 // ============================================================
 async function startInterview() {
-  const topic      = document.getElementById("topic-input").value.trim();
+  const jd         = document.getElementById("jd-input").value.trim();
+  const resumeFile = document.getElementById("resume-input").files[0];
   const difficulty = document.getElementById("difficulty-select").value;
 
-  if (!topic) {
-    alert("Please enter an interview topic");
+  if (!jd) {
+    alert("Please enter a job description");
     return;
   }
-
-  document.getElementById("level-display").textContent =
-    document.getElementById("difficulty-select").options[
-      document.getElementById("difficulty-select").selectedIndex
-    ].text;
 
   showLoading(true, "Starting emotion detector…");
 
@@ -99,13 +95,19 @@ async function startInterview() {
     });
     if (!startRes.ok) throw new Error("Failed to start emotion detector");
 
-    showLoading(true, "Generating your interview question…");
+    showLoading(true, "Generating your first interview question…");
 
-    // ── 2. Fetch question & create session ────────────────────────────────────
+    // ── 2. Fetch question & create session using FormData ─────────────────────
+    const formData = new FormData();
+    formData.append("jd", jd);
+    formData.append("level", difficulty);
+    if (resumeFile) {
+      formData.append("resume", resumeFile);
+    }
+
     const res = await fetch(`${API_BASE}/hr-questions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, level: difficulty, count: 1 }),
+      body: formData, // Fetch automatically sets correct Content-Type for FormData
     });
     if (!res.ok) throw new Error(await res.text());
 
@@ -113,11 +115,7 @@ async function startInterview() {
     currentSession = new InterviewSessionClient(data);
 
     // ── 3. Update UI ──────────────────────────────────────────────────────────
-    document.getElementById("question-display").innerText  = currentSession.question_text;
-    document.getElementById("topic-display").innerText     = currentSession.topic;
-    document.getElementById("level-display").innerText     = currentSession.difficulty_level;
-    document.getElementById("session-display").innerText   =
-      currentSession.session_id.substring(0, 8) + "…";
+    updateInterviewUI(data);
 
     // ── 4. Camera (display only – Python handles analysis) ───────────────────
     await startCamera();
@@ -134,6 +132,59 @@ async function startInterview() {
   }
 
   showLoading(false);
+}
+
+function updateInterviewUI(data) {
+    document.getElementById("question-display").innerText  = data.question;
+    document.getElementById("topic-display").innerText     = data.topic;
+    document.getElementById("level-display").innerText     = data.difficulty_level;
+    document.getElementById("session-display").innerText   =
+      data.session_id.substring(0, 8) + "…";
+    
+    // Clear previous transcript and feedback
+    document.getElementById("transcript-display").innerText = "Click \"Start Recording\" to begin transcription…";
+    document.getElementById("feedback-section").classList.add("hidden");
+}
+
+async function nextQuestion() {
+    const difficulty = document.getElementById("difficulty-select").value;
+    showLoading(true, "Generating next question…");
+    
+    try {
+        // Stop current session polling and recording if active
+        if (recognition) recognition.stop();
+        stopEmotionPolling();
+        
+        // Fetch new question (backend uses session-stored JD/Resume)
+        const res = await fetch(`${API_BASE}/hr-questions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ level: difficulty })
+        });
+        
+        if (!res.ok) throw new Error("Failed to fetch next question");
+        
+        const data = await res.json();
+        currentSession = new InterviewSessionClient(data);
+        
+        // Update UI
+        updateInterviewUI(data);
+        
+        // Restart emotion polling for new question
+        startEmotionPolling();
+        
+        // Scroll to question
+        document.querySelector(".question-section").scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+        
+    } catch (e) {
+        console.error("Next question error:", e);
+        alert("Failed to get next question. Please try again.");
+    }
+    
+    showLoading(false);
 }
 
 // ============================================================
@@ -351,11 +402,9 @@ function startRecording() {
     return;
   }
 
-  recognition               = new SpeechRecognition();
-  recognition.continuous    = true;
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
   recognition.interimResults= true;
-  recognition.lang          = "en-US";
-
   transcriptText     = "";
   recordingStartTime = Date.now();
 

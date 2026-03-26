@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - SkillUp Interview</title>
+  <link rel="stylesheet" href='/static/css/style.css'>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    .guide-card {
+      display: flex;
+      gap: 30px;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+    .guide-image {
+      flex: 1;
+      max-width: 500px;
+      border-radius: 16px;
+      border: 1px solid var(--border-glass);
+      box-shadow: var(--shadow-lg);
+    }
+    .guide-text {
+      flex: 1;
+    }
+    .guide-step {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      background: var(--accent-gradient);
+      color: white;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 32px;
+      font-weight: 700;
+      margin-right: 12px;
+    }
+    @media (max-width: 992px) {
+      .guide-card {
+        flex-direction: column;
+      }
+      .guide-image {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon"><i class="ph-bold ph-target"></i></div>
+        <span class="logo-text">SkillUp</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item {{ 'active' if active_page == 'dashboard' }}">
+          <i class="ph-bold ph-house nav-icon"></i>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="/interview" class="nav-item {{ 'active' if active_page == 'interview' }}">
+          <i class="ph-bold ph-user nav-icon"></i>
+          <span class="nav-text">Interview</span>
+        </a>
+        <a href="/progress-dashboard" class="nav-item {{ 'active' if active_page == 'progress' }}">
+          <i class="ph-bold ph-chart-bar nav-icon"></i>
+          <span class="nav-text">Progress</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/logout" class="nav-item" style="color: var(--danger);">
+          <i class="ph-bold ph-sign-out nav-icon"></i>
+          <span class="nav-text">Logout</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="header">
+        <h1>Dashboard</h1>
+        <p class="subtitle">Welcome to SkillUp. Here's how to master your interview skills.</p>
+      </header>
+
+      <div class="container">
+        <!-- Step 1 -->
+        <div class="section guide-card">
+          <div class="guide-text">
+            <h2 class="section-title"><span class="guide-step">1</span>Configure Interview</h2>
+            <p style="margin-top: 15px; color: var(--text-gray); font-size: 1.1em;">
+              Start by pasting the job description you're targetting and uploading your resume. 
+              Our AI will analyze both to tailor questions specifically to your background and the role's requirements.
+            </p>
+          </div>
+          <img src="/static/images/setup_guide.png" alt="Setup Guide" class="guide-image">
+        </div>
+
+        <!-- Step 2 -->
+        <div class="section guide-card" style="flex-direction: row-reverse;">
+          <div class="guide-text">
+            <h2 class="section-title"><span class="guide-step">2</span>Interview Session</h2>
+            <p style="margin-top: 15px; color: var(--text-gray); font-size: 1.1em;">
+              During the interview, our AI monitor tracks your facial expressions and tone. 
+              Speak naturally as you respond to the AI-generated questions. The system transcribes your speech in real-time.
+            </p>
+          </div>
+          <img src="/static/images/interview_guide.png" alt="Interview Session" class="guide-image">
+        </div>
+
+        <!-- Step 3 -->
+        <div class="section guide-card">
+          <div class="guide-text">
+            <h2 class="section-title"><span class="guide-step">3</span>Analyze & Improve</h2>
+            <p style="margin-top: 15px; color: var(--text-gray); font-size: 1.1em;">
+              After each session, get detailed feedback and a score based on your performance. 
+              Track your growth over time on the progress dashboard to see your improvement in technical and soft skills.
+            </p>
+          </div>
+          <img src="/static/images/progress_guide.png" alt="Progress Guide" class="guide-image">
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -22,24 +22,31 @@ class InterviewGenratSession:
             base_url="http://127.0.0.1:1234/v1",
             api_key="not-needed"
         )  
-    def Genrat_hr_questions(self,level="easy",count=1,topic="Technical"):
-
+    def Genrat_hr_questions(self, level="easy", count=1, jd_text="", resume_text=""):
         prompt = f"""
-        You are an experienced HR interviewer conducting a {level}-level interview.
-        Generate {count} {level}-level interview question related to: {topic}
-        The question should assess practical application related to the topic.
-        Return ONLY the question text, nothing else.
+        You are an experienced HR interviewer.
+        Generate {count} {level}-level interview question.
+        
+        CONTEXT:
+        Job Description: {jd_text if jd_text else "Not provided"}
+        Candidate Resume: {resume_text if resume_text else "Not provided"}
+        
+        INSTRUCTIONS:
+        1. If Job Description is provided, align the question with its requirements.
+        2. If Resume is provided, tailor the question to the candidate's experience and skills.
+        3. The question should be a single, clear {level}-level interview question.
+        4. Focus on practical application and previous experiences.
+        5. Return ONLY the question text, nothing else.
         """
 
         try:
-            result   = self.llm.invoke(prompt)
+            result = self.llm.invoke(prompt)
             question = result.content if hasattr(result, "content") else str(result)
-
-            return question
+            return question.strip()
         
         except Exception as e:
             print("HR QUESTIONS Genrate ERROR:", e)
-            return jsonify({"error": str(e)}), 500
+            return "Failed to generate question: " + str(e)
         
     def evaluate_Answer(self,structured_payload):
         """
