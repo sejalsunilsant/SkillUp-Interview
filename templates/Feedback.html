@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Feedback - SkillUp</title>
+    <link rel="stylesheet" href='/static/css/style.css'>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Specific enhancements for Feedback page that build upon style.css */
+        .score-card {
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            margin-bottom: 40px;
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-lg);
+            backdrop-filter: var(--glass-blur);
+            animation: zoomIn 0.6s ease-out;
+        }
+
+        .score-circle {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-gradient);
+            box-shadow: 0 0 30px rgba(108, 99, 255, 0.4);
+        }
+
+        .score-value {
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1;
+            color: white;
+        }
+
+        .score-label {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .recommendation {
+            max-width: 500px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-success { background: rgba(72, 207, 173, 0.2); color: var(--success); border: 1px solid var(--success); }
+        .badge-warning { background: rgba(255, 184, 108, 0.2); color: var(--warning); border: 1px solid var(--warning); }
+        .badge-danger { background: rgba(255, 107, 107, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+
+        .feedback-display {
+            line-height: 1.8;
+        }
+
+        /* Styling for the breakdown section */
+        .q-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 4px solid var(--accent-primary);
+            transition: all 0.3s ease;
+        }
+
+        .q-card:hover {
+            transform: translateX(8px);
+            background: rgba(255, 255, 255, 0.05);
+            border-left-width: 6px;
+        }
+
+        .q-text {
+            color: var(--accent-primary);
+            font-weight: 700;
+            margin-bottom: 15px;
+            font-size: 1.15rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .ans-feedback {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            border-left: 3px solid var(--accent-secondary);
+            font-size: 0.95rem;
+        }
+
+        .hr-answer {
+            background: rgba(72, 207, 173, 0.05);
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px dashed rgba(72, 207, 173, 0.4);
+            position: relative;
+        }
+
+        .hr-label {
+            color: var(--success);
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+            letter-spacing: 0.1em;
+        }
+
+        /* History Table */
+        .history-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 10px;
+        }
+
+        .history-row {
+            background: var(--bg-input);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .history-row td {
+            padding: 20px;
+            border-top: 1px solid var(--border-glass);
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .history-row td:first-child { border-left: 1px solid var(--border-glass); border-top-left-radius: 12px; border-bottom-left-radius: 12px; color: var(--accent-primary); font-weight: 700; width: 100px; }
+        .history-row td:last-child { border-right: 1px solid var(--border-glass); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+
+        .transcript-q { font-weight: 600; color: var(--text-white); margin-bottom: 8px; }
+        .transcript-a { color: var(--text-gray); font-style: italic; font-size: 0.95rem; }
+
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            .score-card { flex-direction: column; text-align: center; gap: 30px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon"><i class="ph-bold ph-target"></i></div>
+                <span class="logo-text">SkillUp</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item {{ 'active' if active_page == 'dashboard' }}">
+                    <i class="ph-bold ph-house nav-icon"></i>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+                <a href="/interview" class="nav-item {{ 'active' if active_page == 'interview' }}">
+                    <i class="ph-bold ph-user nav-icon"></i>
+                    <span class="nav-text">Interview</span>
+                </a>
+                <a href="/progress-dashboard" class="nav-item {{ 'active' if active_page == 'progress' }}">
+                    <i class="ph-bold ph-chart-bar nav-icon"></i>
+                    <span class="nav-text">Progress</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="nav-item" style="color: var(--danger);">
+                    <i class="ph-bold ph-sign-out nav-icon"></i>
+                    <span class="nav-text">Logout</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <header class="header">
+                    <div class="badge badge-success">Session Evaluated</div>
+                    <h1>Interview Results</h1>
+                    <p class="subtitle">Comprehensive performance analysis & HR-recommended improvements</p>
+                </header>
+
+                <!-- TOP SECTION: SCORE & REC -->
+                <section class="score-card">
+                    <div class="score-circle">
+                        <span class="score-value" id="scoreValue">--</span>
+                        <span class="score-label">Score</span>
+                    </div>
+                    
+                    <div class="recommendation">
+                        <div id="hiringBadge" class="badge">Analysing...</div>
+                        <h2 id="recTitle" style="font-family: var(--font-heading); margin-bottom: 10px;">Hiring Recommendation</h2>
+                        <p id="recText" style="color: var(--text-gray); line-height: 1.6;">Please wait while we process your detailed feedback...</p>
+                    </div>
+                </section>
+
+                <div class="feedback-grid" style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+                    
+                    <!-- AI FEEDBACK CONTENT -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h2 class="section-title">AI Performance Review</h2>
+                        </div>
+                        <div id="feedbackBody" class="feedback-display">
+                            <div style="text-align: center; padding: 50px;">
+                                <div class="spinner"></div>
+                                <p>Generating your personalized performance breakdown...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INTERVIEW HISTORY / TRANSCRIPT -->
+                    <div class="section" id="historySection">
+                        <div class="section-header">
+                            <h2 class="section-title">Interview Transcript</h2>
+                        </div>
+                        <div id="historyBody">
+                            <p style="color: var(--text-gray); text-align: center; padding: 20px;">No transcript data available for this session.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-group" style="margin-top: 40px; justify-content: center;">
+                    <a href="/dashboard" class="btn-secondary">
+                        <i class="ph ph-arrow-left"></i> Dashboard
+                    </a>
+                    <a href="/interview" class="btn-primary">
+                        <i class="ph ph-repeat"></i> Start New Interview
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sessionId = "{{ session_id }}";
+            
+            async function fetchFeedback() {
+                try {
+                    const response = await fetch(`/api/feedback/${sessionId}`);
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        document.getElementById('feedbackBody').innerHTML = `<p style="color: var(--danger)">Error: ${data.error}</p>`;
+                        return;
+                    }
+                    
+                    const feedback = data.feedback;
+                    const history = data.history || [];
+                    
+                    // Parse Score
+                    const scoreMatch = feedback.match(/## Score\s*\r?\n*\s*([\d.]+)\/10/i) || 
+                                     feedback.match(/Score:\s*([\d.]+)\/10/i) ||
+                                     feedback.match(/([\d.]+)\/10/);
+                    if (scoreMatch) {
+                        document.getElementById('scoreValue').textContent = scoreMatch[1];
+                    }
+                    
+                    // Parse Recommendation
+                    const recMatch = feedback.match(/## Hiring Recommendation\s*\r?\n*\s*(.*)/i) ||
+                                   feedback.match(/Hiring Recommendation:\s*(.*)/i);
+                    if (recMatch) {
+                        const rec = recMatch[1].trim();
+                        const recText = document.getElementById('recText');
+                        const hBadge = document.getElementById('hiringBadge');
+                        
+                        recText.textContent = rec;
+                        
+                        if (rec.toLowerCase().includes('move forward') || rec.toLowerCase().includes('hire') || rec.toLowerCase().includes('yes')) {
+                            hBadge.textContent = 'Highly Recommended';
+                            hBadge.className = 'badge badge-success';
+                        } else if (rec.toLowerCase().includes('hold')) {
+                            hBadge.textContent = 'Potential Fit';
+                            hBadge.className = 'badge badge-warning';
+                        } else {
+                            hBadge.textContent = 'Not Recommended';
+                            hBadge.className = 'badge badge-danger';
+                        }
+                    }
+
+                    // Pre-process markdown for better styling of the question breakdown
+                    let processedFeedback = feedback;
+                    const breakdownRegex = /\*\*Question\*\*: (.*?)\r?\n\*\*Feedback on Candidate's Answer\*\*: (.*?)\r?\n\*\*HR Recommended Answer\*\*: (.*?)(?=\r?\n\*\*Question|$|\r?\n##)/gs;
+                    
+                    processedFeedback = processedFeedback.replace(breakdownRegex, (match, q, f, hr) => {
+                        return `
+<div class="q-card">
+    <div class="q-text"><i class="ph-bold ph-question"></i> ${q.trim()}</div>
+    <div class="ans-feedback"><strong>Feedback:</strong> ${f.trim()}</div>
+    <div class="hr-answer"><span class="hr-label">HR Recommended Answer</span>${hr.trim()}</div>
+</div>`;
+                    });
+
+                    // Render markdown to HTML
+                    document.getElementById('feedbackBody').innerHTML = marked.parse(processedFeedback);
+
+                    // Render History/Transcript
+                    if (history && history.length > 0) {
+                        let historyHtml = '<table class="history-table">';
+                        history.forEach((turn, index) => {
+                            if (turn.question && turn.answer) {
+                                historyHtml += `
+                                <tr class="history-row">
+                                    <td>Q${index + 1}</td>
+                                    <td>
+                                        <div class="transcript-q">${turn.question}</div>
+                                        <div class="transcript-a">" ${turn.answer} "</div>
+                                    </td>
+                                </tr>`;
+                            }
+                        });
+                        historyHtml += '</table>';
+                        document.getElementById('historyBody').innerHTML = historyHtml;
+                    }
+                    
+                } catch (error) {
+                    console.error('Error fetching feedback:', error);
+                    document.getElementById('feedbackBody').innerHTML = '<p>Something went wrong while loading feedback.</p>';
+                }
+            }
+            
+            fetchFeedback();
+        });
+    </script>
+</body>
+</html>
