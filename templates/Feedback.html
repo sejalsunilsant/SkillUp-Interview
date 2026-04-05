@@ -182,6 +182,10 @@
                     <i class="ph-bold ph-chart-bar nav-icon"></i>
                     <span class="nav-text">Progress</span>
                 </a>
+                <a href="/feedback" class="nav-item {{ 'active' if active_page == 'feedback' }}">
+                    <i class="ph-bold ph-chat-circle-dots nav-icon"></i>
+                    <span class="nav-text">Feedback</span>
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <a href="/logout" class="nav-item" style="color: var(--danger);">
@@ -201,7 +205,7 @@
                 </header>
 
                 <!-- TOP SECTION: SCORE & REC -->
-                <section class="score-card">
+                <section class="score-card" id="currentSessionHeader" style="display: none;">
                     <div class="score-circle">
                         <span class="score-value" id="scoreValue">--</span>
                         <span class="score-label">Score</span>
@@ -217,7 +221,7 @@
                 <div class="feedback-grid" style="display: grid; grid-template-columns: 1fr; gap: 24px;">
                     
                     <!-- AI FEEDBACK CONTENT -->
-                    <div class="section">
+                    <div class="section" id="feedbackSection" style="display: none;">
                         <div class="section-header">
                             <h2 class="section-title">AI Performance Review</h2>
                         </div>
@@ -230,12 +234,25 @@
                     </div>
 
                     <!-- INTERVIEW HISTORY / TRANSCRIPT -->
-                    <div class="section" id="historySection">
+                    <div class="section" id="transcriptSection" style="display: none;">
                         <div class="section-header">
                             <h2 class="section-title">Interview Transcript</h2>
                         </div>
                         <div id="historyBody">
                             <p style="color: var(--text-gray); text-align: center; padding: 20px;">No transcript data available for this session.</p>
+                        </div>
+                    </div>
+
+                    <!-- GLOBAL HISTORY -->
+                    <div class="section" id="globalHistorySection">
+                        <div class="section-header">
+                            <h2 class="section-title">All Interview History</h2>
+                        </div>
+                        <div id="globalHistoryBody">
+                            <div style="text-align: center; padding: 30px;">
+                                <div class="spinner"></div>
+                                <p>Loading your interview history...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -255,6 +272,20 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sessionId = "{{ session_id }}";
+            const isNone = (sessionId === "None" || sessionId === "" || sessionId === "null");
+            
+            if (!isNone) {
+                document.getElementById('currentSessionHeader').style.display = 'flex';
+                document.getElementById('feedbackSection').style.display = 'block';
+                document.getElementById('transcriptSection').style.display = 'block';
+                fetchFeedback();
+            } else {
+                // If no session, maybe change the header
+                document.querySelector('h1').textContent = "Interview History";
+                document.querySelector('.badge-success').textContent = "Past Results";
+            }
+
+            fetchGlobalHistory();
             
             async function fetchFeedback() {
                 try {
@@ -299,7 +330,7 @@
                         }
                     }
 
-                    // Pre-process markdown for better styling of the question breakdown
+                    // Pre-process markdown
                     let processedFeedback = feedback;
                     const breakdownRegex = /\*\*Question\*\*: (.*?)\r?\n\*\*Feedback on Candidate's Answer\*\*: (.*?)\r?\n\*\*HR Recommended Answer\*\*: (.*?)(?=\r?\n\*\*Question|$|\r?\n##)/gs;
                     
@@ -312,10 +343,8 @@
 </div>`;
                     });
 
-                    // Render markdown to HTML
                     document.getElementById('feedbackBody').innerHTML = marked.parse(processedFeedback);
 
-                    // Render History/Transcript
                     if (history && history.length > 0) {
                         let historyHtml = '<table class="history-table">';
                         history.forEach((turn, index) => {
@@ -333,14 +362,58 @@
                         historyHtml += '</table>';
                         document.getElementById('historyBody').innerHTML = historyHtml;
                     }
-                    
                 } catch (error) {
                     console.error('Error fetching feedback:', error);
                     document.getElementById('feedbackBody').innerHTML = '<p>Something went wrong while loading feedback.</p>';
                 }
             }
-            
-            fetchFeedback();
+
+            async function fetchGlobalHistory() {
+                try {
+                    const response = await fetch('/get-user-sessions');
+                    const sessions = await response.json();
+                    
+                    if (!sessions || sessions.length === 0) {
+                        document.getElementById('globalHistoryBody').innerHTML = '<p style="color: var(--text-gray); text-align: center; padding: 20px;">No interview history found.</p>';
+                        return;
+                    }
+
+                    let html = `
+<table class="history-table">
+    <thead>
+        <tr style="text-align: left; color: var(--text-gray);">
+            <th style="padding: 10px 20px;">Date</th>
+            <th style="padding: 10px 20px;">Topic/JD</th>
+            <th style="padding: 10px 20px;">Score</th>
+            <th style="padding: 10px 20px;">Action</th>
+        </tr>
+    </thead>
+    <tbody>`;
+
+                    sessions.forEach(session => {
+                        const date = new Date(session.session_date).toLocaleDateString();
+                        const scoreClass = session.score >= 7 ? 'text-success' : (session.score >= 5 ? 'text-warning' : 'text-danger');
+                        
+                        html += `
+<tr class="history-row">
+    <td>${date}</td>
+    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${session.topic || 'General Interview'}</td>
+    <td class="${scoreClass}" style="font-weight: 700;">${session.score}/10</td>
+    <td>
+        <a href="/feedback/${session.session_id || ''}" class="btn-secondary" style="padding: 8px 15px; font-size: 0.85rem;">
+            View Details
+        </a>
+    </td>
+</tr>`;
+                    });
+
+                    html += '</tbody></table>';
+                    document.getElementById('globalHistoryBody').innerHTML = html;
+                } catch (error) {
+                    console.error('Error fetching global history:', error);
+                    document.getElementById('globalHistoryBody').innerHTML = '<p>Failed to load interview history.</p>';
+                }
+            }
         });
     </script>
 </body>

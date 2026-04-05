@@ -27,6 +27,10 @@
           <i class="ph-bold ph-chart-bar nav-icon"></i>
           <span class="nav-text">Progress</span>
         </a>
+        <a href="/feedback" class="nav-item {{ 'active' if active_page == 'feedback' }}">
+          <i class="ph-bold ph-chat-circle-dots nav-icon"></i>
+          <span class="nav-text">Feedback</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <a href="/logout" class="nav-item" style="color: var(--danger);">
@@ -110,6 +114,7 @@
                   <th>Topic</th>
                   <th>Score</th>
                   <th>Feedback</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody id="sessionTable"></tbody>

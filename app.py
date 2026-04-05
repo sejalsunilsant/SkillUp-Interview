@@ -12,8 +12,6 @@ from functools import wraps
 from langchain.chat_models import init_chat_model
 from Services.Genrator import InterviewGenratSession
 
-# ── Emotion Detector ────────────
-from emotion_detector import EmotionDetector
 
 # ── DB helper (unchanged)
 from database_con import get_db_connection,StoreSession
@@ -40,45 +38,25 @@ llm = ChatGroq(
 #     api_key="not-needed"
 # )
 
-# ── Global emotion detector instance ─────────────────────────────────────────
-
-emotion_detector: EmotionDetector = EmotionDetector(   
-    smooth_window=10,
-    min_confidence=0.40,
-)
 
 
 
 # ============================================================
 # INTERVIEW SESSION MODEL
 # ============================================================
-class InterviewSession:
-    def __init__(self, question_text, topic, difficulty_level):
+class ActiveInterview:
+    def __init__(self, jd_text, resume_text, difficulty_level):
         self.session_id       = str(uuid.uuid4())
-        self.question_text    = question_text
-        self.user_transcription = None
-        self.topic            = topic
+        self.jd_text          = jd_text
+        self.resume_text      = resume_text
         self.difficulty_level = difficulty_level
+        self.question_count   = 0
+        self.history          = [] 
+        self.current_question = None
+        self.current_stage    = "Introduction"
         self.timestamp        = datetime.utcnow().isoformat()
-        self.posture_data     = None   # filled at evaluate time
-        self.feedback         = None
-        self.emotion_history = []
 
-
-    def to_dict(self):
-        return {
-            "session_id":         self.session_id,
-            "question_text":      self.question_text,
-            "user_transcription": self.user_transcription,
-            "topic":              self.topic,
-            "difficulty_level":   self.difficulty_level,
-            "timestamp":          self.timestamp,
-            "posture_data":       self.posture_data,
-            "feedback":           self.feedback,
-        }
-
-
-sessions: dict[str, InterviewSession] = {}
+active_interviews: dict[str, ActiveInterview] = {}
 
 
 # ============================================================
@@ -192,72 +170,55 @@ def dashboard_page():
     return render_template("Dashboard.html", active_page='dashboard')
 
 
+@app.route("/feedback")
+@app.route("/feedback/<session_id>")
+@login_required
+def feedback_page(session_id=None):
+    return render_template("Feedback.html", session_id=session_id, active_page='feedback')
+
+
+@app.route("/api/feedback/<session_id>")
+@login_required
+def get_feedback_api(session_id):
+    # Try fetching from DB first
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT feedback, question, answer FROM interview_sessions WHERE session_id=%s", (session_id,))
+    res = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    
+    # We also want the history from the memory session if it's still there
+    history = []
+    if session_id in active_interviews:
+        history = active_interviews[session_id].history
+
+    if res and res["feedback"] and res["feedback"] != "Pending Final Evaluation":
+        return jsonify({
+            "feedback": res["feedback"],
+            "last_question": res["question"],
+            "last_answer": res["answer"],
+            "history": history
+        })
+    
+    # If not in DB but in memory
+    if session_id in active_interviews:
+        interview = active_interviews[session_id]
+        return jsonify({
+            "feedback": getattr(interview, 'feedback', "Generating..."),
+            "history": interview.history
+        })
+
+    return jsonify({"error": "Feedback not found"}), 404
+
+
 # ============================================================
-# NEW ► START SESSION  (starts emotion detector)
+# NEW ► START SESSION
 # ============================================================
 @app.route("/start-session", methods=["POST"])
 def start_session():
-    """
-    Call this when the candidate clicks 'Start Interview'.
-    Boots the EmotionDetector background thread if not already running.
-    """
-    if not emotion_detector.is_running():
-        try:
-            emotion_detector.start()
-            return jsonify({"success": True, "message": "Emotion detector started"})
-        except Exception as e:
-            return jsonify({"success": False, "message": str(e)}), 500
+    return jsonify({"success": True, "message": "Session started"})
 
-    return jsonify({"success": True, "message": "Emotion detector already running"})
-
-
-# ============================================================
-# NEW ► LIVE EMOTION STATUS 
-# ============================================================
-@app.route("/emotion-status", methods=["GET"])
-def emotion_status():
-    """
-    Frontend polls this every ~500 ms to display live emotion data.
-    Returns JSON compatible with the existing status-badge UI.
-    """
-    if not emotion_detector.is_running():
-        return jsonify({
-            "emotion":       "N/A",
-            "confidence":    0.0,
-            "face_detected": False,
-            "stability":     "Inactive",
-            "notes":         "Detector not started",
-        })
-
-    data = emotion_detector.get_current_emotion()
-    return jsonify({
-        "emotion":           data["emotion"],
-        "confidence":        round(data["confidence"] * 100, 1), 
-        "face_detected":     data["face_detected"],
-        "stability":         data["stability"],
-        "dominant_emotion":  data.get("dominant_emotion", "N/A"),
-        "emotion_summary":   data.get("emotion_summary", {}),
-        "all_probabilities": data.get("all_probabilities", {}),
-        "notes":             data["notes"],
-        "duration":          data.get("duration", 0),
-    })
-import base64
-import numpy as np
-import cv2
-@app.route("/detect-emotion", methods=["POST"])
-def detect_emotion():
-
-    data = request.json["image"]
-
-    image_data = base64.b64decode(data.split(",")[1])
-
-    np_arr = np.frombuffer(image_data, np.uint8)
-
-    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-    result = emotion_detector.process_frame(frame)
-
-    return jsonify(result)
 # Progress dashboard
 @app.route("/progress-dashboard",methods=["GET"])
 @login_required
@@ -273,7 +234,7 @@ def get_user_session():
     conn=get_db_connection()
     cursor=conn.cursor(dictionary=True)
     cursor.execute("""
-        select topic,score,feedback,session_date
+        select session_id, topic, score, feedback, session_date
         from interview_sessions where user_id=%s
         order by session_date desc
     """,(user_id,))
@@ -281,24 +242,32 @@ def get_user_session():
     cursor.close()
     conn.close()
     return jsonify(sessions)
+
 # ============================================================
-# STEP 1: Generate HR Question & Create Session
+# NEW ► RESUME MANAGEMENT
 # ============================================================
-@app.route("/hr-questions", methods=["POST"])
-def hr_questions():
-    # We now handle multipart/form-data or JSON
+@app.route("/api/profile/resume", methods=["GET"])
+@login_required
+def get_user_resume():
+    user_id = session.get("user_id")
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT resume_text FROM users WHERE user_id=%s", (user_id,))
+    res = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    resume_text = res["resume_text"] if res and res["resume_text"] else ""
+    return jsonify({"resume_text": resume_text})
+
+@app.route("/api/profile/resume", methods=["POST"])
+@login_required
+def update_user_resume():
+    user_id = session.get("user_id")
+    resume_text = ""
+    
     if request.is_json:
-        data = request.json
-        level = data.get("level", "easy")
-        jd_text = data.get("jd", "")
-        resume_text = data.get("resume_text", "")
+        resume_text = request.json.get("resume_text", "")
     else:
-        # Multipart form data (for file upload)
-        level = request.form.get("level", "easy")
-        jd_text = request.form.get("jd", "")
-        resume_text = ""
-        
-        # Check for resume file
         if 'resume' in request.files:
             file = request.files['resume']
             if file and file.filename.endswith('.pdf'):
@@ -309,42 +278,88 @@ def hr_questions():
                 except Exception as e:
                     print("PDF extract error:", e)
             elif file:
-                # Assume text if not PDF
                 resume_text = file.read().decode('utf-8', errors='ignore')
+        else:
+            resume_text = request.form.get("resume_text", "")
+            
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET resume_text=%s WHERE user_id=%s", (resume_text, user_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    session["resume_text"] = resume_text
+    return jsonify({"success": True, "message": "Resume updated"})
 
-    # Store JD and Resume text in flask session for follow-up questions
+# ============================================================
+# STEP 1: Generate HR Question & Create Session
+# ============================================================
+@app.route("/hr-questions", methods=["POST"])
+def hr_questions():
+    if request.is_json:
+        data = request.json
+        level = data.get("level", "medium")
+        jd_text = data.get("jd", "")
+        session_id = data.get("session_id")
+    else:
+        # Multipart form data
+        level = request.form.get("level", "medium")
+        jd_text = request.form.get("jd", "")
+        session_id = request.form.get("session_id")
+
     if jd_text:
         session["jd_text"] = jd_text
-    if resume_text:
-        session["resume_text"] = resume_text
 
-    # Use stored JD/Resume if not provided in current request
     final_jd = jd_text or session.get("jd_text", "")
-    final_resume = resume_text or session.get("resume_text", "")
+    
+    final_resume = session.get("resume_text", "")
+    if session.get("user_id") and not final_resume:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT resume_text FROM users WHERE user_id=%s", (session.get("user_id"),))
+        res = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if res and res["resume_text"]:
+            final_resume = res["resume_text"]
+            session["resume_text"] = final_resume
 
     try:
-        # Generate question using JD and Resume
-        question = llm_service.Genrat_hr_questions(
-            level=level, 
-            count=1, 
-            jd_text=final_jd, 
-            resume_text=final_resume
-        )
+        # Check if we have an active session to continue
+        if session_id and session_id in active_interviews:
+            interview = active_interviews[session_id]
+            interview.difficulty_level = level
+        else:
+            interview = ActiveInterview(final_jd, final_resume, level)
+            active_interviews[interview.session_id] = interview
+            
+        # State machine dict context
+        state_dict = {
+            "jd_text": interview.jd_text,
+            "resume_text": interview.resume_text,
+            "question_count": interview.question_count,
+            "history": interview.history,
+            "level": interview.difficulty_level
+        }
         
-        interview_session = InterviewSession(
-                question_text=question,
-                topic="JD-Based",
-                difficulty_level=level,
-            )
-        sessions[interview_session.session_id] = interview_session
+        question, stage = llm_service.get_next_question(state_dict)
+        
+        interview.current_question = question
+        interview.current_stage = stage
+        interview.question_count += 1
+        
+        # Store the current asked question in history
+        current_turn = {"question": question, "answer": "", "feedback": ""}
+        interview.history.append(current_turn)
         
         return jsonify({
-                "session_id":       interview_session.session_id,
-                "question":         interview_session.question_text,
-                "topic":            interview_session.topic,
-                "difficulty_level": interview_session.difficulty_level,
-                "timestamp":        interview_session.timestamp,
-            })
+            "session_id":       interview.session_id,
+            "question":         interview.current_question,
+            "topic":            interview.current_stage,
+            "difficulty_level": interview.difficulty_level,
+            "timestamp":        interview.timestamp,
+        })
     except Exception as e:
         print("HR QUESTIONS ERROR:", e)
         return jsonify({"error": str(e)}), 500
@@ -353,8 +368,11 @@ def hr_questions():
 # ============================================================
 # STEP 2-4: Evaluate Response  (now uses EmotionDetector data)
 # ============================================================
-@app.route("/evaluate", methods=["POST"])
-def evaluate():
+# ============================================================
+# STEP 2-3: Submit Answer without Blocking Evaluation
+# ============================================================
+@app.route("/submit-answer", methods=["POST"])
+def submit_answer():
     data        = request.json
     session_id  = data.get("session_id")
     transcript  = data.get("transcript", "")
@@ -363,95 +381,93 @@ def evaluate():
     if not transcript.strip():
         return jsonify({"error": "Empty transcript"}), 400
 
-    if session_id not in sessions:
+    if session_id not in active_interviews:
         return jsonify({"error": "Invalid session ID"}), 400
 
-    interview_session = sessions[session_id]
-    interview_session.user_transcription = transcript
+    interview = active_interviews[session_id]
 
-    # ── Merge emotion data from Python detector ───────────────────────────────
-    if emotion_detector.is_running():
-        emotion_summary = emotion_detector.get_session_summary()
-    else:
-        # Graceful fallback: use whatever the frontend sent
-        emotion_summary = {
-            "duration":         frontend_posture.get("duration", 0),
-            "stability":        frontend_posture.get("stability", "Unknown"),
-            "notes":            frontend_posture.get("notes", "Emotion detector not running"),
-            "emotion":          "Unknown",
-            "dominant_emotion": "Unknown",
-            "emotion_summary":  {},
-        }
+    # Update the turn in history
+    if interview.history:
+        interview.history[-1]['answer'] = transcript
+        interview.history[-1]['feedback'] = "Pending Evaluation"
 
-    interview_session.posture_data = emotion_summary
+    db_topic = f"{interview.current_stage} | {interview.jd_text[:30]}..." if interview.jd_text else interview.current_stage
 
-    # ── Structured payload for LLM ───────────────────────────────────────────
-    structured_payload = {
-        "session_id":       interview_session.session_id,
-        "question_text":    interview_session.question_text,
-        "user_transcription": interview_session.user_transcription,
-        "topic":            interview_session.topic,
-        "difficulty_level": interview_session.difficulty_level,
-        "timestamp":        interview_session.timestamp,
-        "posture_data": {
-            "duration":         emotion_summary.get("duration", 0),
-            "stability":        emotion_summary.get("stability", "Unknown"),
-            "notes":            emotion_summary.get("notes", "Not available"),
-            "current_emotion":  emotion_summary.get("emotion", "Unknown"),
-            "dominant_emotion": emotion_summary.get("dominant_emotion", "Unknown"),
-            "emotion_summary":  emotion_summary.get("emotion_summary", {}),
-        },
+    db_data = {
+        "session_id": interview.session_id,
+        "user_id": session.get("user_id"),
+        "topic": db_topic,
+        "question": interview.current_question,
+        "answer": transcript,
+        "score": 0,
+        "feedback": "Pending Final Evaluation",
+        "session_date": datetime.now()
     }
-    try:
-        feedback = llm_service.evaluate_Answer(structured_payload)
-        interview_session.feedback = feedback
 
-        # Extract score from feedback string (e.g., "7/10")
-        import re
-        score_match = re.search(r"## Score\s*(\d+)/10", feedback)
-        score = int(score_match.group(1)) if score_match else 0
-        
-        # Determine topic: use JD snippet or default
-        db_topic = interview_session.topic
-        if session.get("jd_text"):
-            # Use first 30 chars of JD as topic context
-            db_topic = f"JD: {session.get('jd_text')[:30]}..."
+    StoreSession(db_data)
 
-        # Prepare DB data
-        db_data = {
-            "session_id": interview_session.session_id,
-            "user_id": session.get("user_id"),
-            "topic": db_topic,
-            "question": interview_session.question_text,
-            "answer": transcript,
-            "score": score,
-            "feedback": feedback,
-            "session_date": datetime.now()
-        }
-
-        # Store in database
-        StoreSession(db_data)
-
-        return jsonify({
-            "session_id":   interview_session.session_id,
-            "feedback":     feedback,
-            "session_data": structured_payload,
-        })
-
-    except Exception as e:
-        return jsonify({"error in app": str(e)}), 500
+    return jsonify({
+        "status": "success",
+        "session_id": interview.session_id
+    })
 
 
 # ============================================================
-# NEW ► STOP SESSION  (stops emotion detector)
+# STEP 4: Evaluate Entire Interview
+# ============================================================
+@app.route("/finish-interview", methods=["POST"])
+def finish_interview():
+    data = request.json
+    session_id = data.get("session_id")
+    
+    if session_id not in active_interviews:
+        return jsonify({"error": "Invalid session ID"}), 400
+
+    interview = active_interviews[session_id]
+    
+    try:
+        feedback = llm_service.evaluate_all(interview)
+        
+        # Extract score using regex, expecting '## Score\n[X]/10' or similar
+        import re
+        score = 0
+        match = re.search(r'## Score\s*\n*\s*(\d+(?:\.\d+)?)/10', feedback, re.IGNORECASE)
+        if not match:
+            # Maybe just simple number match
+            match = re.search(r'(\d+)/10', feedback)
+        
+        if match:
+            score = float(match.group(1))
+            
+        # Update DB with final feedback and score
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE interview_sessions SET feedback=%s, score=%s WHERE session_id=%s", (feedback, score, session_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as db_e:
+            print("DB Update Error in finish_interview:", db_e)
+
+        return jsonify({
+            "status": "success",
+            "session_id": session_id,
+            "feedback": feedback
+        })
+    except Exception as e:
+        print("Finish Interview Error:", e)
+        return jsonify({"error in app evaluate_all": str(e)}), 500
+
+
+# ============================================================
+# NEW ► STOP SESSION
 # ============================================================
 @app.route("/stop-session", methods=["POST"])
 def stop_session():
     """
     Call this after evaluation or when the user resets.
     """
-    if emotion_detector.is_running():
-        emotion_detector.stop()
     return jsonify({"success": True, "message": "Session stopped"})
 
 
@@ -460,9 +476,13 @@ def stop_session():
 # ============================================================
 @app.route("/session/<session_id>", methods=["GET"])
 def get_session(session_id):
-    if session_id not in sessions:
+    if session_id not in active_interviews:
         return jsonify({"error": "Session not found"}), 404
-    return jsonify(sessions[session_id].to_dict())
+    return jsonify({
+       "session_id": active_interviews[session_id].session_id,
+       "question_count": active_interviews[session_id].question_count,
+       "current_stage": active_interviews[session_id].current_stage
+    })
 
 
 # ============================================================

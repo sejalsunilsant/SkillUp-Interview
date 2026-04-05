@@ -56,6 +56,9 @@ let transcriptText   = "";
 let emotionPollTimer = null;   // replaces postureInterval
 let recordingStartTime = null;
 let timerInterval    = null;
+let isRecording      = false;
+let localEmotionHistory = {};
+let emotionTotalFrames = 0;
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -65,19 +68,89 @@ const API_BASE = "http://127.0.0.1:5000";
 // ============================================================
 // INITIALIZATION
 // ============================================================
-document.addEventListener("DOMContentLoaded", function () {
-  document.getElementById("difficulty-select").addEventListener("change", function (e) {
-    document.getElementById("level-display").textContent =
-      e.target.options[e.target.selectedIndex].text;
-  });
+document.addEventListener("DOMContentLoaded", async function () {
+  const diffSelect = document.getElementById("difficulty-select");
+  if (diffSelect) {
+    diffSelect.addEventListener("change", function (e) {
+      document.getElementById("level-display").textContent =
+        e.target.options[e.target.selectedIndex].text;
+    });
+  }
+
+  // Fetch resume on load
+  try {
+    const res = await fetch(`${API_BASE}/api/profile/resume`);
+    if (res.ok) {
+      const data = await res.json();
+      const resumeTextEl = document.getElementById("resume-text");
+      if (resumeTextEl) {
+          resumeTextEl.value = data.resume_text || "";
+          resumeTextEl.placeholder = "Paste your resume text here or upload a PDF.";
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch resume:", e);
+  }
 });
+
+async function saveResume() {
+  const resumeText = document.getElementById("resume-text").value;
+  const statusEl = document.getElementById("resume-status");
+  statusEl.textContent = "Saving...";
+  try {
+    const res = await fetch(`${API_BASE}/api/profile/resume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resume_text: resumeText })
+    });
+    if (res.ok) {
+      statusEl.textContent = "Saved!";
+      setTimeout(() => statusEl.textContent = "", 2000);
+    } else {
+      statusEl.textContent = "Failed to save.";
+    }
+  } catch (e) {
+    console.error("Save resume error:", e);
+    statusEl.textContent = "Error saving.";
+  }
+}
+
+async function uploadResumeFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const statusEl = document.getElementById("resume-status");
+  statusEl.textContent = "Uploading & Extracting...";
+  
+  const formData = new FormData();
+  formData.append("resume", file);
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/profile/resume`, {
+      method: "POST",
+      body: formData
+    });
+    if (res.ok) {
+      // Refresh textarea
+      const fetchRes = await fetch(`${API_BASE}/api/profile/resume`);
+      const data = await fetchRes.json();
+      document.getElementById("resume-text").value = data.resume_text;
+      statusEl.textContent = "Extracted and Saved!";
+      setTimeout(() => statusEl.textContent = "", 2000);
+    } else {
+      statusEl.textContent = "Failed to process PDF.";
+    }
+  } catch (e) {
+    console.error("Upload resume error:", e);
+    statusEl.textContent = "Error parsing PDF.";
+  }
+}
 
 // ============================================================
 // START INTERVIEW
 // ============================================================
 async function startInterview() {
   const jd         = document.getElementById("jd-input").value.trim();
-  const resumeFile = document.getElementById("resume-input").files[0];
   const difficulty = document.getElementById("difficulty-select").value;
 
   if (!jd) {
@@ -85,29 +158,27 @@ async function startInterview() {
     return;
   }
 
-  showLoading(true, "Starting emotion detector…");
+  showLoading(true, "Initializing local facial analysis...");
 
   try {
-    // ── 1. Boot Python emotion detector ──────────────────────────────────────
+    const MODEL_URL = 'https://unpkg.com/@vladmandic/face-api/model/';
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+
+    // ── 1. Boot Python emotion detector (optional cleanup/state) ──────────────────────────────────────
     const startRes = await fetch(`${API_BASE}/start-session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
-    if (!startRes.ok) throw new Error("Failed to start emotion detector");
+    if (!startRes.ok) throw new Error("Failed to start session backend");
 
     showLoading(true, "Generating your first interview question…");
 
-    // ── 2. Fetch question & create session using FormData ─────────────────────
-    const formData = new FormData();
-    formData.append("jd", jd);
-    formData.append("level", difficulty);
-    if (resumeFile) {
-      formData.append("resume", resumeFile);
-    }
-
+    // ── 2. Fetch question & create session using JSON ─────────────────────
     const res = await fetch(`${API_BASE}/hr-questions`, {
       method: "POST",
-      body: formData, // Fetch automatically sets correct Content-Type for FormData
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jd: jd, level: difficulty })
     });
     if (!res.ok) throw new Error(await res.text());
 
@@ -159,7 +230,7 @@ async function nextQuestion() {
         const res = await fetch(`${API_BASE}/hr-questions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ level: difficulty })
+            body: JSON.stringify({ level: difficulty, session_id: currentSession ? currentSession.session_id : null })
         });
         
         if (!res.ok) throw new Error("Failed to fetch next question");
@@ -205,73 +276,88 @@ async function startCamera() {
 }
 
 // ============================================================
-// EMOTION POLLING  — browser sends frames to /detect-emotion
+// EMOTION POLLING  — browser uses face-api.js locally
 // ============================================================
 function startEmotionPolling() {
   if (emotionPollTimer) clearInterval(emotionPollTimer);
+
+  localEmotionHistory = {};
+  emotionTotalFrames = 0;
 
   emotionPollTimer = setInterval(async () => {
     const video = document.getElementById("video");
     if (!video || video.readyState < 2 || video.videoWidth === 0) return;
 
-    // Capture current frame from the live video element
-    const canvas = document.createElement("canvas");
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    const imageDataUrl = canvas.toDataURL("image/jpeg", 0.8);
-
     try {
-      const res = await fetch(`${API_BASE}/detect-emotion`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ image: imageDataUrl }),
-      });
-      if (!res.ok) return;
-      const raw = await res.json();
-
-      // /detect-emotion returns confidence 0-1; convert to % for display
-      const data = {
-        emotion:          raw.emotion          || "Unknown",
-        confidence:       raw.confidence != null ? +(raw.confidence * 100).toFixed(1) : 0,
-        face_detected:    raw.face_detected    || false,
-        all_probabilities: raw.all_probabilities || {},
-        // These accumulate server-side; fetch from /emotion-status in parallel
-        dominant_emotion: raw.dominant_emotion || raw.emotion || "Unknown",
-        emotion_summary:  raw.emotion_summary  || {},
-        stability:        raw.stability        || "Analyzing",
-        notes:            raw.notes            || "",
-        duration:         raw.duration         || 0,
-      };
-
-      // Also fetch the running session stats (dominant emotion, history %)
-      const statsRes = await fetch(`${API_BASE}/emotion-status`);
-      if (statsRes.ok) {
-        const stats = await statsRes.json();
-        data.dominant_emotion = stats.dominant_emotion || data.dominant_emotion;
-        data.emotion_summary  = stats.emotion_summary  || data.emotion_summary;
-        data.stability        = stats.stability        || data.stability;
-        data.duration         = stats.duration         || data.duration;
-        data.notes            = stats.notes            || data.notes;
+      const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
+      let data = {};
+      if (detection) {
+        // Find dominant emotion
+        const expressions = detection.expressions;
+        let maxEmotion = "neutral";
+        let maxScore = 0;
+        for (const [emo, score] of Object.entries(expressions)) {
+          if (score > maxScore) {
+            maxScore = score;
+            maxEmotion = emo;
+          }
+        }
+        
+        emotionTotalFrames++;
+        localEmotionHistory[maxEmotion] = (localEmotionHistory[maxEmotion] || 0) + 1;
+        
+        let dominant_overall = "neutral";
+        let max_overall = 0;
+        let emotion_summary = {};
+        for (const [emo, count] of Object.entries(localEmotionHistory)) {
+          const pct = Math.round((count / emotionTotalFrames) * 100);
+          emotion_summary[emo] = pct;
+          if (count > max_overall) {
+            max_overall = count;
+            dominant_overall = emo;
+          }
+        }
+        
+        data = {
+          emotion: maxEmotion,
+          confidence: +(maxScore * 100).toFixed(1),
+          face_detected: true,
+          all_probabilities: expressions,
+          dominant_emotion: dominant_overall,
+          emotion_summary: emotion_summary,
+          stability: "Active",
+          notes: "Analyzed locally",
+          duration: timerInterval ? Math.floor((Date.now() - recordingStartTime) / 1000) : 0,
+        };
+      } else {
+        data = {
+          emotion: "Unknown",
+          confidence: 0,
+          face_detected: false,
+          all_probabilities: {},
+          dominant_emotion: currentSession ? currentSession.posture_data.dominant_emotion : "Unknown",
+          emotion_summary: currentSession ? currentSession.posture_data.emotion_summary : {},
+          stability: "Face not detected",
+          notes: "No face found",
+          duration: timerInterval ? Math.floor((Date.now() - recordingStartTime) / 1000) : 0,
+        };
       }
 
       if (currentSession) currentSession.updateEmotionData(data);
 
-      // Update posture-status badge with coaching icon
       const coach    = getCoaching(data.emotion);
       const label    = data.face_detected
         ? `${coach.icon} ${data.emotion} — ${coach.tip.split("—")[0].split(".")[0]}`
         : `👤 No Face Detected`;
       updateStatusBadge("posture-status", label, data.face_detected ? "status-active" : "status-warning");
 
-      // Update emotion panel
       const emotionPanel = document.getElementById("emotion-panel");
       if (emotionPanel) emotionPanel.innerHTML = buildEmotionPanelHTML(data);
 
     } catch (err) {
-      // Network error — don't flood console
+      console.error("Local face-api error:", err);
     }
-  }, 1500);  // send a frame every 1.5 s
+  }, 1000);  // analyze every 1 second
 }
 
 function stopEmotionPolling() {
@@ -431,13 +517,33 @@ function startRecording() {
   recognition.onerror = (e) => {
     console.error("Recognition error:", e.error);
     if (e.error === "no-speech") {
-      updateStatusBadge("transcript-status", "No speech detected", "status-warning");
+      updateStatusBadge("transcript-status", "No speech detected (will keep listening)", "status-warning");
+    } else if (e.error === "not-allowed" || e.error === "audio-capture") {
+      isRecording = false;
+      updateStatusBadge("transcript-status", "Microphone error or permission denied", "status-error");
+      toggleRecording(false);
+      stopTimer();
     }
   };
 
-  recognition.onend = () => console.log("Speech recognition ended");
+  recognition.onend = () => {
+    console.log("Speech recognition ended.");
+    if (isRecording) {
+      console.log("Restarting speech recognition...");
+      setTimeout(() => {
+        if (isRecording) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("Failed to restart recording:", e);
+          }
+        }
+      }, 250); // Small delay to prevent 'already started' DOMException
+    }
+  };
 
   try {
+    isRecording = true;
     recognition.start();
     toggleRecording(true);
     startTimer();
@@ -449,6 +555,7 @@ function startRecording() {
 }
 
 async function stopRecording() {
+  isRecording = false;
   if (recognition) recognition.stop();
 
   stopTimer();
@@ -472,13 +579,13 @@ async function stopRecording() {
 // ANALYSIS
 // ============================================================
 async function analyzeResponse() {
-  showLoading(true, "Analysing your interview response…");
+  showLoading(true, "Saving your response…");
 
   try {
     const payload = currentSession.toPayload();
     console.log("Sending structured payload:", payload);
 
-    const res = await fetch(`${API_BASE}/evaluate`, {
+    const res = await fetch(`${API_BASE}/submit-answer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -489,7 +596,7 @@ async function analyzeResponse() {
     const data = await res.json();
 
     document.getElementById("feedback-display").innerHTML =
-      formatFeedback(data.feedback);
+      "<b>Response Saved Successfully!</b><br><br>Click <i>Next Question</i> to proceed or click <i>Finish Interview</i> if you are ready to evaluate your overall performance.";
     document.getElementById("feedback-section").classList.remove("hidden");
     document.getElementById("feedback-section").scrollIntoView({
       behavior: "smooth",
@@ -497,12 +604,32 @@ async function analyzeResponse() {
     });
 
   } catch (e) {
-    console.error("Analysis error:", e);
-    alert("Failed to analyse response. Please try again.");
+    console.error("Submission error:", e);
+    alert("Failed to save response. Please try again.");
   }
 
   showLoading(false);
-  updateStatusBadge("transcript-status", "Analysis Complete", "status-active");
+  updateStatusBadge("transcript-status", "Answer Saved", "status-active");
+}
+
+async function finishInterview() {
+  showLoading(true, "Compiling your final comprehensive HR Evaluation… (This may take up to 2 minutes)");
+  try {
+    const res = await fetch(`${API_BASE}/finish-interview`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ session_id: currentSession.session_id })
+    });
+    
+    if (!res.ok) throw new Error("Failed evaluating");
+    const data = await res.json();
+    
+    // Redirect to the new feedback page
+    window.location.href = `/feedback/${data.session_id}`;
+  } catch(e) {
+    alert("Error fetching final performance review.");
+  }
+  showLoading(false);
 }
 
 // ============================================================
@@ -566,6 +693,7 @@ function formatFeedback(feedback) {
 
 async function resetInterview() {
   // Stop all streams
+  isRecording = false;
   if (videoStream)      videoStream.getTracks().forEach((t) => t.stop());
   if (recognition)      recognition.stop();
   stopEmotionPolling();

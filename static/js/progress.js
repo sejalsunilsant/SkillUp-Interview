@@ -48,6 +48,7 @@ async function loadProgress() {
                 <td title="${s.topic}">${s.topic}</td>
                 <td><strong>${s.score}/10</strong></td>
                 <td><small>${displayFeedback}</small></td>
+                <td><a href="/feedback/${s.session_id}" class="btn-secondary" style="padding: 5px 10px; font-size: 0.8rem;">View</a></td>
             `;
             table.appendChild(row);
         });

@@ -6,6 +6,7 @@
   <title>SkillUp Interview</title>
   <link rel="stylesheet" href='/static/css/style.css'>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://unpkg.com/@vladmandic/face-api/dist/face-api.js"></script>
   <style>
     /* ── Emotion Panel Styles ── */
     .emotion-panel {
@@ -80,6 +81,10 @@
           <i class="ph-bold ph-chart-bar nav-icon"></i>
           <span class="nav-text">Progress</span>
         </a>
+        <a href="/feedback" class="nav-item {{ 'active' if active_page == 'feedback' }}">
+          <i class="ph-bold ph-chat-circle-dots nav-icon"></i>
+          <span class="nav-text">Feedback</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <a href="/logout" class="nav-item" style="color: var(--danger);">
@@ -107,10 +112,18 @@
                      placeholder="Paste the job description here (responsibilities, requirements...)"
                      style="width: 100%; border-radius: 8px; padding: 10px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;"></textarea>
             </div>
-            <div class="input-group">
-              <label for="resume-input">Upload Resume (PDF)</label>
-              <input type="file" id="resume-input" accept=".pdf"
-                     style="width: 100%; border-radius: 8px; padding: 8px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;">
+            <div class="input-group" style="grid-column: span 2;">
+              <label for="resume-text">Your Resume</label>
+              <textarea id="resume-text" rows="4" 
+                     placeholder="Loading your resume..."
+                     style="width: 100%; border-radius: 8px; padding: 10px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;"></textarea>
+              <div style="display: flex; gap: 10px; margin-top: 10px;">
+                  <button onclick="saveResume()" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: white;">Save Text</button>
+                  <label class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: white;">
+                      Upload PDF <input type="file" id="resume-upload" accept=".pdf" style="display:none;" onchange="uploadResumeFile(event)">
+                  </label>
+                  <span id="resume-status" style="font-size: 0.85em; color: #48cfad; align-self: center;"></span>
+              </div>
             </div>
             <div class="input-group">
               <label for="difficulty-select">Difficulty Level</label>
@@ -230,6 +243,10 @@
                 <button onclick="nextQuestion()" class="btn-primary">
                   <span class="btn-icon">➡️</span>
                   Next Question
+                </button>
+                <button onclick="finishInterview()" class="btn-primary" style="background:#f39c12; border-color:#e67e22;">
+                  <span class="btn-icon">🏆</span>
+                  Finish & Evaluate All
                 </button>
                 <button onclick="resetInterview()" class="btn-secondary">
                   <span class="btn-icon">🚪</span>
