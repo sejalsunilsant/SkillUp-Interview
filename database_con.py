@@ -1,28 +1,44 @@
-from flask import Flask, jsonify
-from flask_mysqldb import MySQL
 import mysql.connector
-from flask_cors import CORS
+from mysql.connector import pooling
+import os
+import logging
+from dotenv import load_dotenv
 
-app = Flask(__name__)
-CORS(app) 
-def get_db_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="manager",
-        database="interview_tracker"
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+# ── DB POLLING CONFIG ──────────────────────────────────────────────────────
+# Using a connection pool is more efficient for production workloads
+db_config = {
+    "host":     os.getenv("DB_HOST", "localhost"),
+    "user":     os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "manager"),
+    "database": os.getenv("DB_NAME", "interview_tracker")
+}
+
+try:
+    connection_pool = mysql.connector.pooling.MySQLConnectionPool(
+        pool_name="skillup_pool",
+        pool_size=5,
+        pool_reset_session=True,
+        **db_config
     )
+    logger.info("Database connection pool initialized")
+except Exception as e:
+    logger.error(f"Failed to initialize DB connection pool: {e}")
+    connection_pool = None
 
- 
+def get_db_connection():
+    if connection_pool:
+        return connection_pool.get_connection()
+    return mysql.connector.connect(**db_config)
+
 def StoreSession(session_data):
-    """
-    Stores interview session data in MySQL database
-    """
-
+    """Stores interview session data in MySQL database"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-
         query = """
         INSERT INTO interview_sessions
         (session_id, user_id, topic, question, answer, score, feedback, session_date)
@@ -33,7 +49,6 @@ def StoreSession(session_data):
         answer = VALUES(answer),
         session_date = VALUES(session_date)
         """
-
         values = (
             session_data["session_id"],
             session_data["user_id"],
@@ -44,31 +59,23 @@ def StoreSession(session_data):
             session_data["feedback"],
             session_data["session_date"]
         )
-
         cursor.execute(query, values)
-
         conn.commit()
-
         cursor.close()
-        conn.close()
-        print("Data Stored")
-
+        logger.info(f"Session {session_data['session_id']} stored successfully")
         return True
-
     except Exception as e:
-        print("DB ERROR:", e)
+        logger.error(f"DB Error StoreSession: {e}")
         return False
-
+    finally:
+        if conn: conn.close()
 
 def StoreGeneratedQuestion(jd, level, phase, question):
-    """
-    Stores generated interview question in MySQL database in structured format
-    """
+    """Stores generated interview question in structured format"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-
-        # Ensure table exists
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS generated_questions (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -78,29 +85,22 @@ def StoreGeneratedQuestion(jd, level, phase, question):
             question_text TEXT
         )
         """)
-        
-        # Avoid exact duplicates
         cursor.execute("SELECT id FROM generated_questions WHERE question_text = %s", (question,))
         if not cursor.fetchone():
-            query = """
-            INSERT INTO generated_questions (job_description, difficulty_level, question_phase, question_text)
-            VALUES (%s, %s, %s, %s)
-            """
+            query = "INSERT INTO generated_questions (job_description, difficulty_level, question_phase, question_text) VALUES (%s, %s, %s, %s)"
             cursor.execute(query, (jd, level, phase, question))
             conn.commit()
-
         cursor.close()
-        conn.close()
         return True
     except Exception as e:
-        print("DB ERROR saving question:", e)
+        logger.error(f"DB Error StoreGeneratedQuestion: {e}")
         return False
-
+    finally:
+        if conn: conn.close()
 
 def GetFallbackQuestions(level, phase=None):
-    """
-    Retrieves questions from DB based on level and optionally phase
-    """
+    """Retrieves questions from DB based on level and optionally phase"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -110,27 +110,11 @@ def GetFallbackQuestions(level, phase=None):
         else:
             query = "SELECT question_text FROM generated_questions WHERE difficulty_level=%s ORDER BY id DESC LIMIT 50"
             cursor.execute(query, (level,))
-            
         res = cursor.fetchall()
         cursor.close()
-        conn.close()
         return [r["question_text"] for r in res]
     except Exception as e:
-        print("DB ERROR fetching questions:", e)
+        logger.error(f"DB Error GetFallbackQuestions: {e}")
         return []
-
-
-@app.route("/test-db")
-def test_db(query):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(query)  
-        data = cursor.fetchall()  
-        cursor.close()
-        conn.close()
-        return f"Connected successfully, data: {data}"
-    except Exception as e:
-        return str(e)
-if __name__=="__main__":
-    print(test_db('SELECT * FROM interview_sessions WHERE user_id = 1'))
+    finally:
+        if conn: conn.close()

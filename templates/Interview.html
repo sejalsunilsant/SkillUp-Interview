@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkillUp Interview</title>
   <link rel="stylesheet" href='/static/css/style.css'>
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <script src="https://unpkg.com/@vladmandic/face-api/dist/face-api.js"></script>
+  <script src="/static/js/phosphor-icons.js" defer></script>
+  <script src="/static/js/face-api.js" defer></script>
   <style>
     /* ── Emotion Panel Styles ── */
     .emotion-panel {
@@ -185,7 +185,12 @@
           <!-- TOP-RIGHT: Interview Question -->
           <div class="top-right">
             <div class="section question-section">
-              <h2 class="section-title">Interview Question</h2>
+              <div class="section-header">
+                <h2 class="section-title">Interview Question</h2>
+                <button onclick="speakQuestion()" ondblclick="stopSpeaking()" id="speak-btn" class="speak-btn" title="Listen to Question (Double click to stop)">
+                  <i class="ph-bold ph-speaker-high"></i>
+                </button>
+              </div>
               <div id="question-display" class="question-box">
                 Configuring your interview session…
               </div>
@@ -270,5 +275,7 @@
   </div>
 
   <script src='/static/js/script.js'></script>
+  {% include 'chatbot.html' %}
+  <script src="/static/js/chatbot.js"></script>
 </body>
 </html>

@@ -1,11 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>User Progress Dashboard</title>
   <link rel="stylesheet" href='/static/css/style.css'>
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="/static/js/phosphor-icons.js" defer></script>
+  <style>
+    .skill-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-top: 15px;
+    }
+
+    .skill-item {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 24px;
+      border-radius: 16px;
+      border: 1px solid var(--border-glass);
+      transition: transform 0.3s ease;
+    }
+
+    .skill-item:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .skill-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+
+    .skill-name {
+      font-weight: 600;
+      color: var(--text-white);
+      font-family: var(--font-heading);
+    }
+
+    .skill-pct {
+      font-weight: 700;
+      color: var(--accent-secondary);
+      font-size: 1.1rem;
+    }
+
+    .skills-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .skill-tag {
+      background: var(--navy-700);
+      color: var(--text-white);
+      padding: 10px 20px;
+      border-radius: 100px;
+      border: 1px solid var(--border-glass);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: fadeIn 0.5s ease both;
+    }
+
+    .skill-tag i {
+      color: var(--warning);
+    }
+
+    /* Table improvements */
+    .progress-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 10px;
+    }
+
+    .progress-table th {
+      text-align: left;
+      padding: 15px 20px;
+      color: var(--text-gray);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+    }
+
+    .progress-table tbody tr {
+      background: var(--bg-input);
+      transition: all 0.3s ease;
+    }
+
+    .progress-table tbody tr:hover {
+      background: var(--navy-700);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .progress-table td {
+      padding: 20px;
+      border-top: 1px solid var(--border-glass);
+      border-bottom: 1px solid var(--border-glass);
+    }
+
+    .progress-table td:first-child {
+      border-left: 1px solid var(--border-glass);
+      border-top-left-radius: 12px;
+      border-bottom-left-radius: 12px;
+    }
+
+    .progress-table td:last-child {
+      border-right: 1px solid var(--border-glass);
+      border-top-right-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
 </head>
+
 <body>
   <div class="app-wrapper">
     <!-- Sidebar -->
@@ -81,39 +204,60 @@
         <!-- SKILL PROGRESS -->
         <div class="section">
           <div class="section-header">
-            <h2 class="section-title">Skill Progress</h2>
+            <h2 class="section-title">Skill Progress Breakdown</h2>
           </div>
 
-          <div class="session-info">
-            <div class="info-item">
-              <span class="info-label">Technical</span>
-              <progress id="techSkill" max="10"></progress>
+          <div class="skill-grid">
+            <div class="skill-item">
+              <div class="skill-header">
+                <span class="skill-name">Technical Proficiency</span>
+                <span id="techPct" class="skill-pct">0%</span>
+              </div>
+              <progress id="techSkill" max="10" value="0"></progress>
             </div>
-            <div class="info-item">
-              <span class="info-label">Communication</span>
-              <progress id="commSkill" max="10"></progress>
+            <div class="skill-item">
+              <div class="skill-header">
+                <span class="skill-name">Communication Clarity</span>
+                <span id="commPct" class="skill-pct">0%</span>
+              </div>
+              <progress id="commSkill" max="10" value="0"></progress>
             </div>
-            <div class="info-item">
-              <span class="info-label">Confidence</span>
-              <progress id="confSkill" max="10"></progress>
+            <div class="skill-item">
+              <div class="skill-header">
+                <span class="skill-name">Interview Confidence</span>
+                <span id="confPct" class="skill-pct">0%</span>
+              </div>
+              <progress id="confSkill" max="10" value="0"></progress>
             </div>
+          </div>
+        </div>
+
+        <!-- SKILLS TO DEVELOP -->
+        <div class="section">
+          <div class="section-header">
+            <h2 class="section-title">Priority Skills to Develop</h2>
+          </div>
+          <div id="skillsToDevelop" class="skills-list">
+            <!-- Populated by JS -->
+            <p style="color: var(--text-gray); padding: 10px;">No specific skills identified yet. Complete more
+              interviews to get insights.</p>
           </div>
         </div>
 
         <!-- RECENT SESSIONS -->
         <div class="section">
           <div class="section-header">
-            <h2 class="section-title">Recent Interview Sessions</h2>
+            <h2 class="section-title">Recent Interview History</h2>
           </div>
 
-          <div class="feedback-box">
-            <table style="width:100%; border-collapse: collapse;">
+          <div style="overflow-x: auto;">
+            <table class="progress-table">
               <thead>
                 <tr>
                   <th>Date</th>
                   <th>Topic</th>
                   <th>Score</th>
-                  <th>Feedback</th>
+                  <th>Feedback Highlights</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -126,5 +270,8 @@
   </div>
 
   <script src="/static/js/progress.js"></script>
+  {% include 'chatbot.html' %}
+  <script src="/static/js/chatbot.js"></script>
 </body>
+
 </html>

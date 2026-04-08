@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interview Feedback - SkillUp</title>
     <link rel="stylesheet" href='/static/css/style.css'>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/js/phosphor-icons.js" defer></script>
+    <script src="/static/js/marked.min.js" defer></script>
     <style>
         /* Specific enhancements for Feedback page that build upon style.css */
         .score-card {
@@ -65,9 +66,23 @@
             letter-spacing: 0.05em;
         }
 
-        .badge-success { background: rgba(72, 207, 173, 0.2); color: var(--success); border: 1px solid var(--success); }
-        .badge-warning { background: rgba(255, 184, 108, 0.2); color: var(--warning); border: 1px solid var(--warning); }
-        .badge-danger { background: rgba(255, 107, 107, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+        .badge-success {
+            background: rgba(72, 207, 173, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(255, 184, 108, 0.2);
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+
+        .badge-danger {
+            background: rgba(255, 107, 107, 0.2);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
 
         .feedback-display {
             line-height: 1.8;
@@ -145,22 +160,55 @@
             border-bottom: 1px solid var(--border-glass);
         }
 
-        .history-row td:first-child { border-left: 1px solid var(--border-glass); border-top-left-radius: 12px; border-bottom-left-radius: 12px; color: var(--accent-primary); font-weight: 700; width: 100px; }
-        .history-row td:last-child { border-right: 1px solid var(--border-glass); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+        .history-row td:first-child {
+            border-left: 1px solid var(--border-glass);
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
+            color: var(--accent-primary);
+            font-weight: 700;
+            width: 100px;
+        }
 
-        .transcript-q { font-weight: 600; color: var(--text-white); margin-bottom: 8px; }
-        .transcript-a { color: var(--text-gray); font-style: italic; font-size: 0.95rem; }
+        .history-row td:last-child {
+            border-right: 1px solid var(--border-glass);
+            border-top-right-radius: 12px;
+            border-bottom-right-radius: 12px;
+        }
+
+        .transcript-q {
+            font-weight: 600;
+            color: var(--text-white);
+            margin-bottom: 8px;
+        }
+
+        .transcript-a {
+            color: var(--text-gray);
+            font-style: italic;
+            font-size: 0.95rem;
+        }
 
         @keyframes zoomIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         @media (max-width: 768px) {
-            .score-card { flex-direction: column; text-align: center; gap: 30px; }
+            .score-card {
+                flex-direction: column;
+                text-align: center;
+                gap: 30px;
+            }
         }
     </style>
 </head>
+
 <body>
     <div class="app-wrapper">
         <!-- Sidebar -->
@@ -210,16 +258,18 @@
                         <span class="score-value" id="scoreValue">--</span>
                         <span class="score-label">Score</span>
                     </div>
-                    
+
                     <div class="recommendation">
                         <div id="hiringBadge" class="badge">Analysing...</div>
-                        <h2 id="recTitle" style="font-family: var(--font-heading); margin-bottom: 10px;">Hiring Recommendation</h2>
-                        <p id="recText" style="color: var(--text-gray); line-height: 1.6;">Please wait while we process your detailed feedback...</p>
+                        <h2 id="recTitle" style="font-family: var(--font-heading); margin-bottom: 10px;">Hiring
+                            Recommendation</h2>
+                        <p id="recText" style="color: var(--text-gray); line-height: 1.6;">Please wait while we process
+                            your detailed feedback...</p>
                     </div>
                 </section>
 
                 <div class="feedback-grid" style="display: grid; grid-template-columns: 1fr; gap: 24px;">
-                    
+
                     <!-- AI FEEDBACK CONTENT -->
                     <div class="section" id="feedbackSection" style="display: none;">
                         <div class="section-header">
@@ -239,7 +289,8 @@
                             <h2 class="section-title">Interview Transcript</h2>
                         </div>
                         <div id="historyBody">
-                            <p style="color: var(--text-gray); text-align: center; padding: 20px;">No transcript data available for this session.</p>
+                            <p style="color: var(--text-gray); text-align: center; padding: 20px;">No transcript data
+                                available for this session.</p>
                         </div>
                     </div>
 
@@ -270,10 +321,10 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const sessionId = "{{ session_id }}";
             const isNone = (sessionId === "None" || sessionId === "" || sessionId === "null");
-            
+
             if (!isNone) {
                 document.getElementById('currentSessionHeader').style.display = 'flex';
                 document.getElementById('feedbackSection').style.display = 'block';
@@ -286,54 +337,62 @@
             }
 
             fetchGlobalHistory();
-            
+
             async function fetchFeedback() {
                 try {
                     const response = await fetch(`/api/feedback/${sessionId}`);
                     const data = await response.json();
-                    
+
                     if (data.error) {
                         document.getElementById('feedbackBody').innerHTML = `<p style="color: var(--danger)">Error: ${data.error}</p>`;
                         return;
                     }
-                    
+
                     const feedback = data.feedback;
                     const history = data.history || [];
-                    
+
                     // Parse Score
-                    const scoreMatch = feedback.match(/## Score\s*\r?\n*\s*([\d.]+)\/10/i) || 
-                                     feedback.match(/Score:\s*([\d.]+)\/10/i) ||
-                                     feedback.match(/([\d.]+)\/10/);
+                    // Look for ## Score: [X]/10 or ## Score \n [X]/10 etc.
+                    const scoreMatch = feedback.match(/##\s*Score[:\s]*([\d.]+)\/10/i) ||
+                        feedback.match(/Score[:\s]*([\d.]+)\/10/i) ||
+                        feedback.match(/([\d.]+)\/10/);
                     if (scoreMatch) {
                         document.getElementById('scoreValue').textContent = scoreMatch[1];
                     }
-                    
+
                     // Parse Recommendation
-                    const recMatch = feedback.match(/## Hiring Recommendation\s*\r?\n*\s*(.*)/i) ||
-                                   feedback.match(/Hiring Recommendation:\s*(.*)/i);
+                    // This captures everything from ## Hiring Recommendation until the end or next section
+                    const recMatch = feedback.match(/##\s*Hiring Recommendation[:\s]*([\s\S]*?)(?=\n##|$)/i) ||
+                        feedback.match(/Hiring Recommendation[:\s]*([\s\S]*?)(?=\n##|$)/i);
                     if (recMatch) {
                         const rec = recMatch[1].trim();
+                        const firstLine = rec.split('\n')[0].trim();
                         const recText = document.getElementById('recText');
                         const hBadge = document.getElementById('hiringBadge');
-                        
+
                         recText.textContent = rec;
-                        
-                        if (rec.toLowerCase().includes('move forward') || rec.toLowerCase().includes('hire') || rec.toLowerCase().includes('yes')) {
+
+                        const lowerRec = rec.toLowerCase();
+                        if (lowerRec.includes('move forward') || lowerRec.includes('hire') || lowerRec.includes('yes')) {
                             hBadge.textContent = 'Highly Recommended';
                             hBadge.className = 'badge badge-success';
-                        } else if (rec.toLowerCase().includes('hold')) {
+                        } else if (lowerRec.includes('hold') || lowerRec.includes('potential')) {
                             hBadge.textContent = 'Potential Fit';
                             hBadge.className = 'badge badge-warning';
-                        } else {
+                        } else if (lowerRec.includes('reject') || lowerRec.includes('no')) {
                             hBadge.textContent = 'Not Recommended';
                             hBadge.className = 'badge badge-danger';
+                        } else {
+                            hBadge.textContent = 'Evaluated';
+                            hBadge.className = 'badge badge-warning';
                         }
                     }
 
-                    // Pre-process markdown
+                    // Pre-process markdown for breakdown
+                    // Handle variable whitespace and newlines (\s*) between headers and content
                     let processedFeedback = feedback;
-                    const breakdownRegex = /\*\*Question\*\*: (.*?)\r?\n\*\*Feedback on Candidate's Answer\*\*: (.*?)\r?\n\*\*HR Recommended Answer\*\*: (.*?)(?=\r?\n\*\*Question|$|\r?\n##)/gs;
-                    
+                    const breakdownRegex = /\*\*Question\*\*:([\s\S]*?)\*\*Feedback on Candidate's Answer\*\*:([\s\S]*?)\*\*HR Recommended Answer\*\*:([\s\S]*?)(?=\*\*Question|$|##)/gi;
+
                     processedFeedback = processedFeedback.replace(breakdownRegex, (match, q, f, hr) => {
                         return `
 <div class="q-card">
@@ -372,7 +431,7 @@
                 try {
                     const response = await fetch('/get-user-sessions');
                     const sessions = await response.json();
-                    
+
                     if (!sessions || sessions.length === 0) {
                         document.getElementById('globalHistoryBody').innerHTML = '<p style="color: var(--text-gray); text-align: center; padding: 20px;">No interview history found.</p>';
                         return;
@@ -393,7 +452,7 @@
                     sessions.forEach(session => {
                         const date = new Date(session.session_date).toLocaleDateString();
                         const scoreClass = session.score >= 7 ? 'text-success' : (session.score >= 5 ? 'text-warning' : 'text-danger');
-                        
+
                         html += `
 <tr class="history-row">
     <td>${date}</td>
@@ -416,5 +475,8 @@
             }
         });
     </script>
+    {% include 'chatbot.html' %}
+    <script src="/static/js/chatbot.js"></script>
 </body>
+
 </html>

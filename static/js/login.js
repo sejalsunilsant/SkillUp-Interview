@@ -31,7 +31,7 @@ async function login() {
   const data = await res.json();
 
   if (res.ok) {
-    window.location.href = "/interview";
+    window.location.href = "/dashboard";
   } else {
     msg.textContent = data.error;
     msg.className = "error";

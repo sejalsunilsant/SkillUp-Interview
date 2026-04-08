@@ -1,0 +1,20 @@
+{
+    "easy": [
+        "Can you tell me a bit about your background and how your experience and education have prepared you for a role as a software engineer?",
+        "What do you think are some key qualities or characteristics that make a person successful in a team environment as a software engineer?",
+        "Can you tell me a little bit about your background and how you became interested in software engineering?",
+        "Can you tell me a little about yourself?",
+        "What are your greatest strengths?",
+        "Why do you want to work here?"
+    ],
+    "medium": [
+        "Describe a time you overcame a difficult challenge at work.",
+        "How do you handle conflict with a coworker?",
+        "Where do you see yourself in five years?"
+    ],
+    "hard": [
+        "Tell me about a time you failed and what you learned from it.",
+        "How would you handle a situation where you strongly disagreed with your manager's decision?",
+        "Can you explain a complex concept to someone without a technical background?"
+    ]
+}

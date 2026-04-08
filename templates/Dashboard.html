@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - SkillUp Interview</title>
   <link rel="stylesheet" href='/static/css/style.css'>
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="/static/js/phosphor-icons.js" defer></script>
   <style>
     .guide-card {
       display: flex;
@@ -13,6 +14,7 @@
       align-items: center;
       margin-bottom: 40px;
     }
+
     .guide-image {
       flex: 1;
       max-width: 500px;
@@ -20,9 +22,11 @@
       border: 1px solid var(--border-glass);
       box-shadow: var(--shadow-lg);
     }
+
     .guide-text {
       flex: 1;
     }
+
     .guide-step {
       display: inline-block;
       width: 32px;
@@ -35,16 +39,19 @@
       font-weight: 700;
       margin-right: 12px;
     }
+
     @media (max-width: 992px) {
       .guide-card {
         flex-direction: column;
       }
+
       .guide-image {
         max-width: 100%;
       }
     }
   </style>
 </head>
+
 <body>
   <div class="app-wrapper">
     <!-- Sidebar -->
@@ -92,7 +99,7 @@
           <div class="guide-text">
             <h2 class="section-title"><span class="guide-step">1</span>Configure Interview</h2>
             <p style="margin-top: 15px; color: var(--text-gray); font-size: 1.1em;">
-              Start by pasting the job description you're targetting and uploading your resume. 
+              Start by pasting the job description you're targetting and uploading your resume.
               Our AI will analyze both to tailor questions specifically to your background and the role's requirements.
             </p>
           </div>
@@ -104,8 +111,9 @@
           <div class="guide-text">
             <h2 class="section-title"><span class="guide-step">2</span>Interview Session</h2>
             <p style="margin-top: 15px; color: var(--text-gray); font-size: 1.1em;">
-              During the interview, our AI monitor tracks your facial expressions and tone. 
-              Speak naturally as you respond to the AI-generated questions. The system transcribes your speech in real-time.
+              During the interview, our AI monitor tracks your facial expressions and tone.
+              Speak naturally as you respond to the AI-generated questions. The system transcribes your speech in
+              real-time.
             </p>
           </div>
           <img src="/static/images/interview_guide.png" alt="Interview Session" class="guide-image">
@@ -116,8 +124,9 @@
           <div class="guide-text">
             <h2 class="section-title"><span class="guide-step">3</span>Analyze & Improve</h2>
             <p style="margin-top: 15px; color: var(--text-gray); font-size: 1.1em;">
-              After each session, get detailed feedback and a score based on your performance. 
-              Track your growth over time on the progress dashboard to see your improvement in technical and soft skills.
+              After each session, get detailed feedback and a score based on your performance.
+              Track your growth over time on the progress dashboard to see your improvement in technical and soft
+              skills.
             </p>
           </div>
           <img src="/static/images/progress_guide.png" alt="Progress Guide" class="guide-image">
@@ -125,5 +134,8 @@
       </div>
     </main>
   </div>
+  {% include 'chatbot.html' %}
+  <script src="/static/js/chatbot.js"></script>
 </body>
+
 </html>

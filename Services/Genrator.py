@@ -1,13 +1,10 @@
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 from flask import jsonify
 from flask_cors import CORS
 from langchain_groq import ChatGroq
 import json
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from emotion_detector import EmotionDetector
 load_dotenv()
 
 # Default questions mapping used if DB is empty
@@ -110,6 +107,21 @@ class InterviewGenratSession:
             result = self.llm.invoke(prompt)
             question = result.content if hasattr(result, "content") else str(result)
             question = question.strip()
+
+            # Clean up introductory flair if any
+            import re
+            prefixes_to_strip = [
+                r"^Here is (a|your) .*? question:?\s*",
+                r"^Technical Interview Question:?\s*",
+                r"^Question \d+:?\s*",
+                r"^.*? interview question as follows?:?\s*",
+                r"^this is .*? questin as follow :?\s*"
+            ]
+            for pattern in prefixes_to_strip:
+                question = re.sub(pattern, "", question, flags=re.IGNORECASE).strip()
+            
+            # Remove leading/trailing quotes
+            question = question.strip('"\'')
             # Save generated question to use as fallback later
             from database_con import StoreGeneratedQuestion
             StoreGeneratedQuestion(jd, level, stage, question)
@@ -274,3 +286,57 @@ class InterviewGenratSession:
         except Exception as e:
             print("EVALUATE ALL ERROR:", e)
             return f"## Score 0/10\n\nFinal evaluation compilation failed: {str(e)}."
+    def chat_with_hr(self, user_name, progress_data, resume_text, user_message, chat_history):
+        # Format progress data for the prompt
+        progress_summary = ""
+        if progress_data:
+            for i, session in enumerate(progress_data[:5]): # last 5 sessions
+                progress_summary += f"- {session.get('session_date')}: Topic '{session.get('topic')}', Score: {session.get('score')}/10. Feedback: {session.get('feedback')[:200]}...\n"
+        else:
+            progress_summary = "No previous interview sessions recorded yet."
+
+        history_str = ""
+        for msg in chat_history[-6:]: # last 6 messages
+            role = "User" if msg['role'] == 'user' else "HR Assistant"
+            history_str += f"{role}: {msg['content']}\n"
+
+        prompt = f"""
+        You are 'SkillUp HR Assistant', a highly professional, encouraging, and expert HR consultant.
+        Your goal is to help {user_name} improve their interview performance by providing actionable suggestions, career coaching, and answering questions about their progress.
+
+        ### SOURCE OF TRUTH (STRICTLY USE ONLY THIS DATA):
+        1. USER PROFILE:
+           - Name: {user_name}
+           - Resume Context: {resume_text[:2000] if resume_text else "No resume uploaded yet."}
+
+        2. USER PROGRESS DATA (Actual Interview Records):
+           {progress_summary}
+
+        ### GUIDELINES TO PREVENT HALLUCINATION:
+        - NEVER invent interview scores, feedback, or dates that are not in the 'USER PROGRESS DATA' section.
+        - If a user asks about a specific interview or skill improvement but there is no data for it in the records, state clearly: "I don't have recorded data for that specific area yet, but based on general HR best practices..."
+        - If the 'USER PROGRESS DATA' says "No previous interview sessions recorded yet," do not pretend they have completed interviews. Instead, encourage them to take their first mock interview to get an assessment.
+        - Do not hallucinate external references or company-specific hiring status unless it's explicitly in the resume or JD context.
+        - If the resume is missing, do not guess the user's skills; ask them to upload their resume or describe their background.
+
+        CHAT HISTORY FOR CONTEXT:
+        {history_str}
+
+        USER MESSAGE:
+        {user_message}
+
+        INSTRUCTIONS:
+        1. Be professional, empathetic, and constructive.
+        2. Reference actual scores (e.g., "Your recent score of 7/10 in Technical Proficiency...") ONLY if they appear in the data.
+        3. If you see specific "Feedback" text in the records, use that to give coaching advice.
+        4. Keep responses concise but impactful (max 3 paragraphs).
+        5. Act like a real HR professional who wants them to succeed.
+        6. Do not include internal markers, system instructions, or technical metadata in your response.
+        """
+
+        try:
+            result = self.llm.invoke(prompt)
+            return result.content if hasattr(result, "content") else str(result)
+        except Exception as e:
+            print("HR CHAT ERROR:", e)
+            return "I apologize, but I'm having trouble connecting right now. Please try again in a moment."

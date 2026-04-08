@@ -1,16 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkillUp Auth</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet">
 
   <style>
     /* ── Reset / base ─────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: 'DM Sans', sans-serif;
@@ -38,16 +47,23 @@
     body::after {
       content: '';
       position: fixed;
-      width: 480px; height: 480px;
-      background: radial-gradient(circle, rgba(108,99,255,0.11) 0%, transparent 70%);
-      top: -100px; left: -80px;
+      width: 480px;
+      height: 480px;
+      background: radial-gradient(circle, rgba(108, 99, 255, 0.11) 0%, transparent 70%);
+      top: -100px;
+      left: -80px;
       pointer-events: none;
       animation: blobDrift 12s ease-in-out infinite alternate;
     }
 
     @keyframes blobDrift {
-      from { transform: translate(0,0) scale(1); }
-      to   { transform: translate(70px,50px) scale(1.15); }
+      from {
+        transform: translate(0, 0) scale(1);
+      }
+
+      to {
+        transform: translate(70px, 50px) scale(1.15);
+      }
     }
 
     /* ── Split-panel wrapper ──────────────────────── */
@@ -60,14 +76,21 @@
       background: #1a1a2e;
       border: 1px solid #2a2a4a;
       border-radius: 20px;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
       overflow: hidden;
-      animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+      animation: slideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
     @keyframes slideUp {
-      from { opacity: 0; transform: translateY(28px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(28px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* ── LEFT: card (form side) ───────────────────── */
@@ -90,13 +113,18 @@
       gap: 10px;
       margin-bottom: 32px;
     }
+
     .brand-icon {
-      width: 36px; height: 36px;
+      width: 36px;
+      height: 36px;
       background: linear-gradient(135deg, #6c63ff, #48cfad);
       border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-size: 1rem;
     }
+
     .brand-name {
       font-family: 'Sora', sans-serif;
       font-size: 1.1rem;
@@ -131,6 +159,7 @@
       color: #8888aa;
       transition: background 0.2s, color 0.2s;
     }
+
     .tab.active {
       background: linear-gradient(135deg, #6c63ff, #48cfad);
       color: #fff;
@@ -168,6 +197,7 @@
       position: relative;
       margin-bottom: 14px;
     }
+
     .input-wrap .ico {
       position: absolute;
       left: 13px;
@@ -178,7 +208,10 @@
       pointer-events: none;
       transition: color 0.2s;
     }
-    .input-wrap:focus-within .ico { color: #6c63ff; }
+
+    .input-wrap:focus-within .ico {
+      color: #6c63ff;
+    }
 
     /* ── Inputs ───────────────────────────────────── */
     .input {
@@ -196,10 +229,14 @@
       margin-top: 0 !important;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .input::placeholder { color: #44446a !important; }
+
+    .input::placeholder {
+      color: #44446a !important;
+    }
+
     .input:focus {
       border-color: #6c63ff !important;
-      box-shadow: 0 0 0 3px rgba(108,99,255,0.15) !important;
+      box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15) !important;
     }
 
     /* ── Primary button ───────────────────────────── */
@@ -215,17 +252,21 @@
       color: #fff !important;
       letter-spacing: 0.05em;
       cursor: pointer;
-      box-shadow: 0 8px 24px rgba(108,99,255,0.35);
+      box-shadow: 0 8px 24px rgba(108, 99, 255, 0.35);
       transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
       margin-top: 8px !important;
       display: block;
     }
+
     .btn-primary.btn-large:hover {
       opacity: 0.92;
       transform: translateY(-1px);
-      box-shadow: 0 12px 32px rgba(108,99,255,0.45);
+      box-shadow: 0 12px 32px rgba(108, 99, 255, 0.45);
     }
-    .btn-primary.btn-large:active { transform: translateY(0); }
+
+    .btn-primary.btn-large:active {
+      transform: translateY(0);
+    }
 
     /* ── Message ──────────────────────────────────── */
     #msg {
@@ -235,10 +276,15 @@
       min-height: 20px;
       text-align: center;
     }
-    #msg.success { color: #48cfad; }
+
+    #msg.success {
+      color: #48cfad;
+    }
 
     /* hidden util */
-    .hidden { display: none !important; }
+    .hidden {
+      display: none !important;
+    }
 
     /* ── RIGHT: visual panel ──────────────────────── */
     .visual-panel {
@@ -252,27 +298,33 @@
       position: relative;
       overflow: hidden;
     }
+
     .visual-panel::before {
       content: '';
       position: absolute;
-      width: 300px; height: 300px;
-      background: radial-gradient(circle, rgba(72,207,173,0.09) 0%, transparent 70%);
-      bottom: -80px; right: -60px;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(72, 207, 173, 0.09) 0%, transparent 70%);
+      bottom: -80px;
+      right: -60px;
       pointer-events: none;
     }
 
     /* "Already a member? LOGIN" row */
     .switch-row {
       position: absolute;
-      top: 22px; right: 24px;
+      top: 22px;
+      right: 24px;
       display: flex;
       align-items: center;
       gap: 10px;
     }
+
     .switch-row span {
       font-size: 0.8rem;
       color: #8888aa;
     }
+
     .btn-switch {
       padding: 7px 20px;
       background: transparent;
@@ -286,25 +338,40 @@
       letter-spacing: 0.06em;
       transition: background 0.2s, color 0.2s;
     }
-    .btn-switch:hover { background: #6c63ff; color: #fff; }
+
+    .btn-switch:hover {
+      background: #6c63ff;
+      color: #fff;
+    }
 
     /* illustration */
     .illustration {
       width: 100%;
       max-width: 300px;
       animation: floatIll 6s ease-in-out infinite;
-      position: relative; z-index: 1;
+      position: relative;
+      z-index: 1;
     }
+
     @keyframes floatIll {
-      0%,100% { transform: translateY(0); }
-      50%      { transform: translateY(-10px); }
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
     }
 
     .visual-tagline {
       text-align: center;
       margin-top: 24px;
-      position: relative; z-index: 1;
+      position: relative;
+      z-index: 1;
     }
+
     .visual-tagline h3 {
       font-family: 'Sora', sans-serif;
       font-size: 1.1rem;
@@ -312,6 +379,7 @@
       color: #eeeeff;
       margin-bottom: 7px;
     }
+
     .visual-tagline p {
       font-size: 0.8rem;
       color: #8888aa;
@@ -322,142 +390,152 @@
 
     /* ── Responsive ───────────────────────────────── */
     @media (max-width: 700px) {
-      .login-wrapper { grid-template-columns: 1fr; }
-      .visual-panel  { display: none; }
-      .login-card    { padding: 40px 28px; }
+      .login-wrapper {
+        grid-template-columns: 1fr;
+      }
+
+      .visual-panel {
+        display: none;
+      }
+
+      .login-card {
+        padding: 40px 28px;
+      }
     }
   </style>
 </head>
+
 <body>
 
-<div class="login-wrapper">
+  <div class="login-wrapper">
 
-  <!-- ═══════════ LEFT: FORM ═══════════ -->
-  <div class="login-card">
+    <!-- ═══════════ LEFT: FORM ═══════════ -->
+    <div class="login-card">
 
-    <div class="brand-row">
-      <div class="brand-icon">🎯</div>
-      <span class="brand-name">SkillUp</span>
-    </div>
-
-    <!-- TOGGLE — same onclick hooks as original -->
-    <div class="auth-tabs">
-      <button class="tab active" onclick="showLogin()">Login</button>
-      <button class="tab"        onclick="showRegister()">Register</button>
-    </div>
-
-    <!-- LOGIN — same id="login-box", same field IDs -->
-    <div id="login-box">
-      <h2>Welcome Back</h2>
-      <p class="login-subtitle">Login to SkillUp</p>
-
-      <label for="login-email">Email</label>
-      <div class="input-wrap">
-
-        <input type="email" id="login-email" class="input"
-               placeholder="john@gmail.com" autocomplete="email">
+      <div class="brand-row">
+        <div class="brand-icon">🎯</div>
+        <span class="brand-name">SkillUp</span>
       </div>
 
-      <label for="login-password">Password</label>
-      <div class="input-wrap">
-        <input type="password" id="login-password" class="input"
-               placeholder="••••••••" autocomplete="current-password">
+      <!-- TOGGLE — same onclick hooks as original -->
+      <div class="auth-tabs">
+        <button class="tab active" onclick="showLogin()">Login</button>
+        <button class="tab" onclick="showRegister()">Register</button>
       </div>
 
-      <!-- same onclick="login()" as original -->
-      <button class="btn-primary btn-large" onclick="login()">LOGIN</button>
-    </div>
+      <!-- LOGIN — same id="login-box", same field IDs -->
+      <div id="login-box">
+        <h2>Welcome Back</h2>
+        <p class="login-subtitle">Login to SkillUp</p>
 
-    <!-- REGISTER — same id="register-box", same field IDs -->
-    <div id="register-box" class="hidden">
-      <h2>Create Account</h2>
-      <p class="login-subtitle">Join SkillUp </p>
+        <label for="login-email">Email</label>
+        <div class="input-wrap">
 
-      <label for="reg-name">Full Name</label>
-      <div class="input-wrap">
-        <input type="text" id="reg-name" class="input" placeholder="Full Name">
+          <input type="email" id="login-email" class="input" placeholder="john@gmail.com" autocomplete="email">
+        </div>
+
+        <label for="login-password">Password</label>
+        <div class="input-wrap">
+          <input type="password" id="login-password" class="input" placeholder="••••••••"
+            autocomplete="current-password">
+        </div>
+
+        <!-- same onclick="login()" as original -->
+        <button class="btn-primary btn-large" onclick="login()">LOGIN</button>
       </div>
 
-      <label for="reg-email">Email</label>
-      <div class="input-wrap">
-        
-        <input type="email" id="reg-email" class="input" placeholder="Email">
+      <!-- REGISTER — same id="register-box", same field IDs -->
+      <div id="register-box" class="hidden">
+        <h2>Create Account</h2>
+        <p class="login-subtitle">Join SkillUp </p>
+
+        <label for="reg-name">Full Name</label>
+        <div class="input-wrap">
+          <input type="text" id="reg-name" class="input" placeholder="Full Name">
+        </div>
+
+        <label for="reg-email">Email</label>
+        <div class="input-wrap">
+
+          <input type="email" id="reg-email" class="input" placeholder="Email">
+        </div>
+
+        <label for="reg-password">Password</label>
+        <div class="input-wrap">
+
+          <input type="password" id="reg-password" class="input" placeholder="Password">
+        </div>
+
+        <label for="reg-confirm">Confirm Password</label>
+        <div class="input-wrap">
+
+          <input type="password" id="reg-confirm" class="input" placeholder="Confirm Password">
+        </div>
+
+        <!-- same onclick="register()" as original -->
+        <button class="btn-primary btn-large" onclick="register()">REGISTER</button>
       </div>
 
-      <label for="reg-password">Password</label>
-      <div class="input-wrap">
-        
-        <input type="password" id="reg-password" class="input" placeholder="Password">
+      <!-- same id="msg" read by login.js -->
+      <p id="msg"></p>
+
+    </div><!-- /.login-card -->
+
+
+    <!-- ═══════════ RIGHT: VISUAL PANEL ═══════════ -->
+    <div class="visual-panel">
+
+      <!-- mirrors screenshot "Already a member? LOGIN" -->
+      <div class="switch-row">
+        <span id="switch-label">New here?</span>
+        <button class="btn-switch" id="switch-btn" onclick="handlePanelSwitch()">REGISTER</button>
       </div>
 
-      <label for="reg-confirm">Confirm Password</label>
-      <div class="input-wrap">
-        
-        <input type="password" id="reg-confirm" class="input" placeholder="Confirm Password">
+
+      <img src="/static/images/loginperson.png" class="illustration" alt="Interview illustration"
+        style="width:100%;max-width:320px;position:relative;z-index:1;animation:floatIll 6s ease-in-out infinite;border-radius: 20px;">
+
+      <div class="visual-tagline">
+        <h3>Practice Makes Perfect</h3>
+        <p>AI-powered mock interviews with real-time emotion coaching</p>
       </div>
 
-      <!-- same onclick="register()" as original -->
-      <button class="btn-primary btn-large" onclick="register()">REGISTER</button>
-    </div>
+    </div><!-- /.visual-panel -->
 
-    <!-- same id="msg" read by login.js -->
-    <p id="msg"></p>
+  </div><!-- /.login-wrapper -->
 
-  </div><!-- /.login-card -->
+  <script src='/static/js/login.js'></script>
 
-
-  <!-- ═══════════ RIGHT: VISUAL PANEL ═══════════ -->
-  <div class="visual-panel">
-
-    <!-- mirrors screenshot "Already a member? LOGIN" -->
-    <div class="switch-row">
-      <span id="switch-label">New here?</span>
-      <button class="btn-switch" id="switch-btn" onclick="handlePanelSwitch()">REGISTER</button>
-    </div>
+  <script>
 
 
-    <img src="/static/images/loginperson.png" class="illustration" alt="Interview illustration" style="width:100%;max-width:320px;position:relative;z-index:1;animation:floatIll 6s ease-in-out infinite;border-radius: 20px;">
+    function showLogin() {
+      document.getElementById('login-box').classList.remove('hidden');
+      document.getElementById('register-box').classList.add('hidden');
+      document.querySelectorAll('.tab')[0].classList.add('active');
+      document.querySelectorAll('.tab')[1].classList.remove('active');
+      document.getElementById('switch-label').textContent = 'New here?';
+      document.getElementById('switch-btn').textContent = 'REGISTER';
+      document.getElementById('msg').textContent = '';
+    }
 
-    <div class="visual-tagline">
-      <h3>Practice Makes Perfect</h3>
-      <p>AI-powered mock interviews with real-time emotion coaching</p>
-    </div>
+    function showRegister() {
+      document.getElementById('register-box').classList.remove('hidden');
+      document.getElementById('login-box').classList.add('hidden');
+      document.querySelectorAll('.tab')[1].classList.add('active');
+      document.querySelectorAll('.tab')[0].classList.remove('active');
+      document.getElementById('switch-label').textContent = 'Already a member?';
+      document.getElementById('switch-btn').textContent = 'LOGIN';
+      document.getElementById('msg').textContent = '';
+    }
 
-  </div><!-- /.visual-panel -->
-
-</div><!-- /.login-wrapper -->
-
-<script src='/static/js/login.js'></script>
-
-<script>
-
-
-  function showLogin() {
-    document.getElementById('login-box').classList.remove('hidden');
-    document.getElementById('register-box').classList.add('hidden');
-    document.querySelectorAll('.tab')[0].classList.add('active');
-    document.querySelectorAll('.tab')[1].classList.remove('active');
-    document.getElementById('switch-label').textContent = 'New here?';
-    document.getElementById('switch-btn').textContent   = 'REGISTER';
-    document.getElementById('msg').textContent = '';
-  }
-
-  function showRegister() {
-    document.getElementById('register-box').classList.remove('hidden');
-    document.getElementById('login-box').classList.add('hidden');
-    document.querySelectorAll('.tab')[1].classList.add('active');
-    document.querySelectorAll('.tab')[0].classList.remove('active');
-    document.getElementById('switch-label').textContent = 'Already a member?';
-    document.getElementById('switch-btn').textContent   = 'LOGIN';
-    document.getElementById('msg').textContent = '';
-  }
-
-  /* right-panel button toggles between the two views */
-  function handlePanelSwitch() {
-    const loginHidden = document.getElementById('login-box').classList.contains('hidden');
-    if (loginHidden) showLogin(); else showRegister();
-  }
-</script>
+    /* right-panel button toggles between the two views */
+    function handlePanelSwitch() {
+      const loginHidden = document.getElementById('login-box').classList.contains('hidden');
+      if (loginHidden) showLogin(); else showRegister();
+    }
+  </script>
 
 </body>
+
 </html>

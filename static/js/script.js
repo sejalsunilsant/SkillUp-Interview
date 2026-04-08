@@ -161,7 +161,7 @@ async function startInterview() {
   showLoading(true, "Initializing local facial analysis...");
 
   try {
-    const MODEL_URL = 'https://unpkg.com/@vladmandic/face-api/model/';
+    const MODEL_URL = '/static/models/';
     await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
     await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
 
@@ -215,6 +215,9 @@ function updateInterviewUI(data) {
     // Clear previous transcript and feedback
     document.getElementById("transcript-display").innerText = "Click \"Start Recording\" to begin transcription…";
     document.getElementById("feedback-section").classList.add("hidden");
+
+    // Automatically speak the new question
+    setTimeout(() => speakQuestion(), 500);
 }
 
 async function nextQuestion() {
@@ -708,6 +711,61 @@ async function resetInterview() {
   transcriptText = "";
   location.reload();
 }
+
+// ============================================================
+// VOICE SYNTHESIS (Speak Question)
+// ============================================================
+function speakQuestion() {
+  const text = document.getElementById("question-display").innerText;
+  if (!text || text.includes("Configuring")) return;
+
+  // Cancel any ongoing speech
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  
+  // Try to find a professional sounding English voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferredVoice = voices.find(v => 
+    v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Female'))
+  );
+  
+  if (preferredVoice) utterance.voice = preferredVoice;
+  
+  utterance.pitch = 1.0;
+  utterance.rate = 0.95; // Slightly slower for clarity
+
+  const btn = document.getElementById("speak-btn");
+  
+  utterance.onstart = () => {
+    if (btn) btn.classList.add("speaking");
+  };
+  
+  utterance.onend = () => {
+    if (btn) btn.classList.remove("speaking");
+  };
+
+  utterance.onerror = () => {
+    if (btn) btn.classList.remove("speaking");
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+/** Stop ongoing speech synthesis */
+function stopSpeaking() {
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    const btn = document.getElementById("speak-btn");
+    if (btn) btn.classList.remove("speaking");
+    console.log("Speech stopped by user.");
+  }
+}
+
+// Ensure voices are loaded (some browsers need this)
+window.speechSynthesis.onvoiceschanged = () => {
+  console.log("Speech synthesis voices loaded.");
+};
 
 // ============================================================
 // ERROR HANDLING

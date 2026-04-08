@@ -1,8 +1,7 @@
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from flask_cors import CORS
+from flask_compress import Compress
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 from datetime import datetime
@@ -18,11 +17,33 @@ from database_con import get_db_connection,StoreSession
 import io
 import PyPDF2
 
+import logging
+
+# ── LOGGING ────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 app = Flask(__name__)
+Compress(app)
+
+# ── SECURITY SETTINGS ──────────────────────────────────────────────────────
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=1800, # 30 mins
+    SEND_FILE_MAX_AGE_DEFAULT=31536000 # 1 year cache for static assets
+)
 CORS(app, resources={r"/*": {"origins": "*"}})
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "skillup_secret_key")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "prod_fallback_secret_7832")
+
+if not os.getenv("groq_Api"):
+    logger.warning("GROQ_API key is not set. Questions will fail to generate.")
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 llm_service=InterviewGenratSession()
@@ -30,13 +51,9 @@ llm = ChatGroq(
     groq_api_key=os.getenv("groq_Api"),
     model_name="llama-3.1-8b-instant",
     temperature=0.7,
-) #as it  required net connection
-# llm = init_chat_model(
-#     model="phi-3.1-mini-4k-instruct",
-#     model_provider="openai",
-#     base_url="http://127.0.0.1:1234/v1",
-#     api_key="not-needed"
-# )
+)
+
+# ...
 
 
 
@@ -95,6 +112,8 @@ def check_login():
 # ============================================================
 @app.route("/", methods=["GET"])
 def login_page():
+    if "user_id" in session:
+        return redirect(url_for("dashboard_page"))
     return render_template("login.html")
 
 
@@ -120,7 +139,7 @@ def register():
         conn.commit()
         return jsonify({"success": True})
     except Exception as e:
-        print(e)
+        logger.error(f"Registration error for {email}: {e}")
         return jsonify({"success": False, "message": "Server error"})
     finally:
         cursor.close()
@@ -180,17 +199,23 @@ def feedback_page(session_id=None):
 @app.route("/api/feedback/<session_id>")
 @login_required
 def get_feedback_api(session_id):
+    user_id = session.get("user_id")
     # Try fetching from DB first
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT feedback, question, answer FROM interview_sessions WHERE session_id=%s", (session_id,))
+    cursor.execute("SELECT feedback, question, answer, user_id FROM interview_sessions WHERE session_id=%s", (session_id,))
     res = cursor.fetchone()
     cursor.close()
     conn.close()
     
+    # Security check: Does this record belong to the current user?
+    if res and res["user_id"] != user_id:
+        return jsonify({"error": "Unauthorized access to this session's feedback"}), 403
+
     # We also want the history from the memory session if it's still there
     history = []
     if session_id in active_interviews:
+        # Additional memory-session security check could go here if needed
         history = active_interviews[session_id].history
 
     if res and res["feedback"] and res["feedback"] != "Pending Final Evaluation":
@@ -244,6 +269,45 @@ def get_user_session():
     return jsonify(sessions)
 
 # ============================================================
+# HR CHATBOT ENDPOINT
+# ============================================================
+@app.route("/api/hr-chat", methods=["POST"])
+@login_required
+def hr_chat():
+    data = request.json
+    user_message = data.get("message", "")
+    chat_history = data.get("history", []) # List of {role: 'user'|'assistant', content: '...'}
+    
+    if not user_message:
+        return jsonify({"error": "Message is required"}), 400
+        
+    user_id = session.get("user_id")
+    user_name = session.get("name", "User")
+    
+    # 1. Get Progress Data
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT topic, score, feedback, session_date
+        FROM interview_sessions WHERE user_id=%s
+        ORDER BY session_date DESC LIMIT 5
+    """, (user_id,))
+    progress_data = cursor.fetchall()
+    
+    # 2. Get Resume
+    cursor.execute("SELECT resume_text FROM users WHERE user_id=%s", (user_id,))
+    res = cursor.fetchone()
+    resume_text = res["resume_text"] if res and res["resume_text"] else ""
+    
+    cursor.close()
+    conn.close()
+    
+    # 3. Call LLM
+    response = llm_service.chat_with_hr(user_name, progress_data, resume_text, user_message, chat_history)
+    
+    return jsonify({"response": response})
+
+# ============================================================
 # NEW ► RESUME MANAGEMENT
 # ============================================================
 @app.route("/api/profile/resume", methods=["GET"])
@@ -276,7 +340,7 @@ def update_user_resume():
                     for page in pdf_reader.pages:
                         resume_text += page.extract_text() + "\n"
                 except Exception as e:
-                    print("PDF extract error:", e)
+                    logger.error(f"PDF extract error for user {user_id}: {e}")
             elif file:
                 resume_text = file.read().decode('utf-8', errors='ignore')
         else:
@@ -361,7 +425,7 @@ def hr_questions():
             "timestamp":        interview.timestamp,
         })
     except Exception as e:
-        print("HR QUESTIONS ERROR:", e)
+        logger.error(f"HR QUESTIONS ERROR: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -448,7 +512,7 @@ def finish_interview():
             cursor.close()
             conn.close()
         except Exception as db_e:
-            print("DB Update Error in finish_interview:", db_e)
+            logger.error(f"DB Update Error in finish_interview for session {session_id}: {db_e}")
 
         return jsonify({
             "status": "success",
@@ -456,7 +520,7 @@ def finish_interview():
             "feedback": feedback
         })
     except Exception as e:
-        print("Finish Interview Error:", e)
+        logger.error(f"Finish Interview Error for session {session_id}: {e}", exc_info=True)
         return jsonify({"error in app evaluate_all": str(e)}), 500
 
 
