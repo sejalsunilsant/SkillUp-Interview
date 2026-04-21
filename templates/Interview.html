@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,9 @@
   <link rel="stylesheet" href='/static/css/style.css'>
   <script src="/static/js/phosphor-icons.js" defer></script>
   <script src="/static/js/face-api.js" defer></script>
+  <!-- Lottie Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@2.0.4/dist/lottie-player.js"></script>
   <style>
     /* ── Emotion Panel Styles ── */
     .emotion-panel {
@@ -16,6 +20,7 @@
       padding: 14px 16px;
       margin-top: 12px;
     }
+
     .emotion-panel h3 {
       font-size: 0.85rem;
       color: #8888aa;
@@ -23,22 +28,26 @@
       letter-spacing: 0.05em;
       margin: 0 0 10px 0;
     }
+
     .emotion-summary p {
       font-size: 0.9rem;
       color: #ccccdd;
       margin: 0 0 8px 0;
     }
+
     .emotion-row {
       display: flex;
       align-items: center;
       gap: 8px;
       margin-bottom: 5px;
     }
+
     .emotion-label {
       width: 80px;
       font-size: 0.78rem;
       color: #aaaacc;
     }
+
     .emotion-bar-wrap {
       flex: 1;
       background: #2a2a4a;
@@ -46,12 +55,14 @@
       height: 8px;
       overflow: hidden;
     }
+
     .emotion-bar {
       height: 100%;
       background: linear-gradient(90deg, #6c63ff, #48cfad);
       border-radius: 4px;
       transition: width 0.4s ease;
     }
+
     .emotion-pct {
       width: 36px;
       font-size: 0.78rem;
@@ -60,6 +71,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="app-wrapper">
     <!-- Sidebar -->
@@ -97,32 +109,38 @@
     <!-- Main Content -->
     <main class="main-content">
       <div class="container">
-        <header class="header">
-          <h1>SkillUp Interview</h1>
-          <p class="subtitle">Professional interview simulation with AI-powered feedback</p>
-        </header>
+
 
         <!-- Interview Setup Section -->
         <div id="setup-section" class="section">
-          <h2 class="section-title">Configure Your Interview</h2>
+          <div class="setup-header-with-avatar">
+            <div class="setup-title-box">
+              <h2 class="section-title">Configure Your Interview</h2>
+              <p class="avatar-intro">Hello! I'm your AI HR assistant. Please provide your details so we can begin the
+                session.</p>
+            </div>
+          </div>
           <div class="setup-grid">
             <div class="input-group" style="grid-column: span 2;">
               <label for="jd-input">Job Description</label>
-              <textarea id="jd-input" rows="4" 
-                     placeholder="Paste the job description here (responsibilities, requirements...)"
-                     style="width: 100%; border-radius: 8px; padding: 10px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;"></textarea>
+              <textarea id="jd-input" rows="4"
+                placeholder="Paste the job description here (responsibilities, requirements...)"
+                style="width: 100%; border-radius: 8px; padding: 10px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;"></textarea>
             </div>
             <div class="input-group" style="grid-column: span 2;">
               <label for="resume-text">Your Resume</label>
-              <textarea id="resume-text" rows="4" 
-                     placeholder="Loading your resume..."
-                     style="width: 100%; border-radius: 8px; padding: 10px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;"></textarea>
+              <textarea id="resume-text" rows="4" placeholder="Loading your resume..."
+                style="width: 100%; border-radius: 8px; padding: 10px; background: #1a1a2e; color: white; border: 1px solid #2a2a4a;"></textarea>
               <div style="display: flex; gap: 10px; margin-top: 10px;">
-                  <button onclick="saveResume()" class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: white;">Save Text</button>
-                  <label class="btn-secondary" style="font-size: 0.9em; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: white;">
-                      Upload PDF <input type="file" id="resume-upload" accept=".pdf" style="display:none;" onchange="uploadResumeFile(event)">
-                  </label>
-                  <span id="resume-status" style="font-size: 0.85em; color: #48cfad; align-self: center;"></span>
+                <button onclick="saveResume()" class="btn-secondary"
+                  style="font-size: 0.9em; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: white;">Save
+                  Text</button>
+                <label class="btn-secondary"
+                  style="font-size: 0.9em; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: white;">
+                  Upload PDF <input type="file" id="resume-upload" accept=".pdf" style="display:none;"
+                    onchange="uploadResumeFile(event)">
+                </label>
+                <span id="resume-status" style="font-size: 0.85em; color: #48cfad; align-self: center;"></span>
               </div>
             </div>
             <div class="input-group">
@@ -184,17 +202,22 @@
 
           <!-- TOP-RIGHT: Interview Question -->
           <div class="top-right">
+            <div class="section avatar-session-section"
+              style="padding: 0; background: transparent; border: none; box-shadow: none;">
+              <div class="hr-visual-container">
+              </div>
+            </div>
             <div class="section question-section">
               <div class="section-header">
                 <h2 class="section-title">Interview Question</h2>
-                <button onclick="speakQuestion()" ondblclick="stopSpeaking()" id="speak-btn" class="speak-btn" title="Listen to Question (Double click to stop)">
+                <button onclick="speakQuestion()" ondblclick="stopSpeaking()" id="speak-btn" class="speak-btn"
+                  title="Listen to Question (Double click to stop)">
                   <i class="ph-bold ph-speaker-high"></i>
                 </button>
               </div>
               <div id="question-display" class="question-box">
                 Configuring your interview session…
               </div>
-
               <div class="session-info">
                 <div class="info-item">
                   <span class="info-label">Topic</span>
@@ -209,35 +232,32 @@
                   <span id="session-display" class="info-value">-</span>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- BOTTOM-RIGHT: Controls + Feedback -->
-          <div class="bottom-right">
-            <div class="controls-section">
-              <div class="section">
-                <div class="section-header">
-                  <h2 class="section-title">Recording Controls</h2>
-                </div>
+              <!-- Moved Controls Section -->
+              <div class="controls-section" style="margin-top: 20px;">
                 <div class="button-group">
-                  <button onclick="startRecording()" id="record-btn"
-                          class="btn-primary btn-record">
+                  <button onclick="startRecording()" id="record-btn" class="btn-primary btn-record"
+                    style="width: 100%; padding: 18px;">
                     <span class="btn-icon">🎤</span>
                     Start Recording Answer
                   </button>
-                  <button onclick="stopRecording()" id="stop-btn"
-                          class="btn-danger btn-stop hidden">
+                  <button onclick="stopRecording()" id="stop-btn" class="btn-danger btn-stop hidden"
+                    style="width: 100%; padding: 18px;">
                     <span class="btn-icon">⏹</span>
                     Stop &amp; Analyze
                   </button>
                 </div>
-                <div id="recording-timer" class="timer hidden">
+                <div id="recording-timer" class="timer hidden"
+                  style="margin-top: 15px; background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3);">
                   <span class="timer-icon">⏱</span>
                   <span id="timer-display">00:00</span>
                 </div>
               </div>
             </div>
+          </div>
 
+          <!-- BOTTOM-RIGHT: Feedback Only -->
+          <div class="bottom-right">
             <!-- Feedback Section -->
             <div id="feedback-section" class="section feedback-section hidden">
               <h2 class="section-title">AI Feedback &amp; Analysis</h2>
@@ -249,7 +269,8 @@
                   <span class="btn-icon">➡️</span>
                   Next Question
                 </button>
-                <button onclick="finishInterview()" class="btn-primary" style="background:#f39c12; border-color:#e67e22;">
+                <button onclick="finishInterview()" class="btn-primary"
+                  style="background:#f39c12; border-color:#e67e22;">
                   <span class="btn-icon">🏆</span>
                   Finish & Evaluate All
                 </button>
@@ -274,8 +295,11 @@
     </main>
   </div>
 
-  <script src='/static/js/script.js'></script>
   {% include 'chatbot.html' %}
   <script src="/static/js/chatbot.js"></script>
+
+  <!-- Main Controller with Cache Busting -->
+  <script src='/static/js/script.js?v={{ range(1, 99999) | random }}'></script>
 </body>
+
 </html>

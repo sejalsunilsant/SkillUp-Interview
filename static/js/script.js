@@ -47,6 +47,100 @@ class InterviewSessionClient {
 }
 
 // ============================================================
+// LOTTIE PLAYER AVATAR MANAGER (ROBUST VERSION)
+// ============================================================
+class AvatarManager {
+  constructor() {
+    this.currentState = 'idle';
+    this.videoIds = ['hr-avatar-setup', 'hr-avatar-main'];
+    this.imageIds = ['hr-image-setup', 'hr-image-main'];
+  }
+
+  init(id) {
+    console.log(`[Avatar] Controller connected to: ${id}`);
+    this.setState('idle');
+  }
+
+  setState(state) {
+    if (this.currentState === state) return;
+    this.currentState = state;
+    console.log(`[Avatar] Transitioning to: ${state}`);
+
+    const isSpeaking = (state === 'speaking');
+
+    // Toggle Videos
+    this.videoIds.forEach(id => {
+      const video = document.getElementById(id);
+      if (video) {
+        if (isSpeaking) {
+          video.classList.remove('hr-media-hidden');
+          video.play().catch(e => console.warn("[Avatar] Play blocked:", e));
+        } else {
+          video.classList.add('hr-media-hidden');
+          video.pause();
+          video.currentTime = 0;
+        }
+      }
+    });
+
+    // Toggle Images
+    this.imageIds.forEach(id => {
+      const img = document.getElementById(id);
+      if (img) {
+        if (!isSpeaking) {
+          img.classList.remove('hr-media-hidden');
+        } else {
+          img.classList.add('hr-media-hidden');
+        }
+      }
+    });
+  }
+
+  async speak(text) {
+    this.setState("speaking");
+    
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    const voices = window.speechSynthesis.getVoices();
+    const bestVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Female')));
+    if (bestVoice) utterance.voice = bestVoice;
+
+    // Word highlighting logic
+    const display = document.getElementById("question-display");
+    if (display) {
+      const words = text.split(' ');
+      display.innerHTML = words.map(w => `<span>${w}</span>`).join(' ');
+      
+      let wordIndex = 0;
+      utterance.onboundary = (event) => {
+        if (event.name === 'word') {
+          const spans = display.querySelectorAll('span');
+          if (spans[wordIndex]) {
+            spans.forEach(s => s.classList.remove('highlight'));
+            spans[wordIndex].classList.add('highlight');
+            wordIndex++;
+          }
+        }
+      };
+    }
+    
+    utterance.onend = () => {
+      this.setState("listening");
+      if (display) display.innerText = text; // Reset highlight but keep text
+    };
+    utterance.onerror = () => this.setState("listening");
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  startListening() { this.setState("listening"); }
+  stopListening() { this.setState("idle"); }
+}
+
+
+
+// ============================================================
 // GLOBAL STATE
 // ============================================================
 let currentSession   = null;
@@ -59,16 +153,22 @@ let timerInterval    = null;
 let isRecording      = false;
 let localEmotionHistory = {};
 let emotionTotalFrames = 0;
+const avatarManager = new AvatarManager();
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
 
-const API_BASE = "http://127.0.0.1:5000";
+// API ENDPOINTS
+const API_BASE = window.location.origin;
+console.log(`[Avatar] App initialized at: ${API_BASE}`);
 
 // ============================================================
 // INITIALIZATION
 // ============================================================
 document.addEventListener("DOMContentLoaded", async function () {
+  // Initialize Avatar
+  avatarManager.init('hr-avatar-setup');
+
   const diffSelect = document.getElementById("difficulty-select");
   if (diffSelect) {
     diffSelect.addEventListener("change", function (e) {
@@ -90,6 +190,32 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   } catch (e) {
     console.error("Failed to fetch resume:", e);
+  }
+
+  // Check daily limit and disable button if needed
+  try {
+    const statusRes = await fetch(`${API_BASE}/user-profile`);
+    if (statusRes.ok) {
+        const profile = await statusRes.json();
+        if (profile.streak_info && profile.streak_info.today_status === 'Completed') {
+            const startBtn = document.querySelector('button[onclick="startInterview()"]');
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = "🏆 Today's Interview Completed";
+                startBtn.style.opacity = "0.7";
+                startBtn.style.cursor = "not-allowed";
+                startBtn.style.background = "linear-gradient(135deg, #48cfad 0%, #1abc9c 100%)";
+                
+                const introBox = document.querySelector('.avatar-intro');
+                if (introBox) {
+                    introBox.innerText = "You’ve already completed today’s interview. Come back tomorrow!";
+                    introBox.style.color = "#48cfad";
+                }
+            }
+        }
+    }
+  } catch (e) {
+      console.error("Failed to check daily limit:", e);
   }
 });
 
@@ -170,6 +296,14 @@ async function startInterview() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
+    
+    if (startRes.status === 403) {
+        const data = await startRes.json();
+        alert(data.message);
+        showLoading(false);
+        return;
+    }
+    
     if (!startRes.ok) throw new Error("Failed to start session backend");
 
     showLoading(true, "Generating your first interview question…");
@@ -196,6 +330,9 @@ async function startInterview() {
 
     document.getElementById("setup-section").style.display = "none";
     document.getElementById("main-grid").classList.remove("hidden");
+    
+    // Initialize main avatar
+  avatarManager.init('hr-avatar-main');
 
   } catch (e) {
     console.error("Interview start error:", e);
@@ -491,6 +628,9 @@ function startRecording() {
     return;
   }
 
+  // Visual sync
+  avatarManager.startListening();
+
   recognition = new SpeechRecognition();
   recognition.continuous = true;
   recognition.interimResults= true;
@@ -551,6 +691,9 @@ function startRecording() {
     toggleRecording(true);
     startTimer();
     updateStatusBadge("transcript-status", "Recording…", "status-recording");
+    
+    // Set avatar to listening state
+    avatarManager.setState('listening');
   } catch (e) {
     console.error("Failed to start recording:", e);
     alert("Failed to start recording. Please try again.");
@@ -566,6 +709,9 @@ async function stopRecording() {
 
   toggleRecording(false);
   updateStatusBadge("transcript-status", "Processing…", "status-processing");
+  
+  // Visual sync
+  avatarManager.stopListening();
 
   currentSession.updateTranscription(transcriptText.trim());
 
@@ -717,40 +863,12 @@ async function resetInterview() {
 // ============================================================
 function speakQuestion() {
   const text = document.getElementById("question-display").innerText;
-  if (!text || text.includes("Configuring")) return;
-
-  // Cancel any ongoing speech
-  window.speechSynthesis.cancel();
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  
-  // Try to find a professional sounding English voice
-  const voices = window.speechSynthesis.getVoices();
-  const preferredVoice = voices.find(v => 
-    v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Female'))
-  );
-  
-  if (preferredVoice) utterance.voice = preferredVoice;
-  
-  utterance.pitch = 1.0;
-  utterance.rate = 0.95; // Slightly slower for clarity
-
-  const btn = document.getElementById("speak-btn");
-  
-  utterance.onstart = () => {
-    if (btn) btn.classList.add("speaking");
-  };
-  
-  utterance.onend = () => {
-    if (btn) btn.classList.remove("speaking");
-  };
-
-  utterance.onerror = () => {
-    if (btn) btn.classList.remove("speaking");
-  };
-
-  window.speechSynthesis.speak(utterance);
+  if (text && !text.includes("Configuring")) {
+    avatarManager.speak(text);
+  }
 }
+
+
 
 /** Stop ongoing speech synthesis */
 function stopSpeaking() {
@@ -758,6 +876,7 @@ function stopSpeaking() {
     window.speechSynthesis.cancel();
     const btn = document.getElementById("speak-btn");
     if (btn) btn.classList.remove("speaking");
+    avatarManager.setState('idle');
     console.log("Speech stopped by user.");
   }
 }

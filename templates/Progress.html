@@ -126,6 +126,39 @@
         transform: translateY(0);
       }
     }
+
+    .streak-card {
+      background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 159, 67, 0.1));
+      border: 1px solid rgba(255, 107, 107, 0.2);
+    }
+    .streak-fire {
+      color: #ff6b6b;
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+    .status-card {
+      background: linear-gradient(135deg, rgba(72, 207, 173, 0.1), rgba(108, 99, 255, 0.1));
+      border: 1px solid rgba(72, 207, 173, 0.2);
+    }
+    .status-icon {
+      color: #48cfad;
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent-gradient);
+      width: 0%;
+      transition: width 0.5s ease;
+    }
   </style>
 </head>
 
@@ -178,7 +211,24 @@
             <h2 class="section-title">Overview</h2>
           </div>
 
-          <div class="main-grid" style="height:auto;">
+          <div class="main-grid" style="height:auto; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <div class="section streak-card">
+              <i class="ph-bold ph-fire streak-fire"></i>
+              <span class="info-label">Current Streak</span>
+              <h1 id="streakCount">0 Days</h1>
+              <div class="progress-bar-container">
+                <div id="streakProgress" class="progress-bar-fill"></div>
+              </div>
+              <p id="streakGoal" style="font-size: 0.8rem; color: var(--text-gray); margin-top: 5px;">0/7 days to milestone</p>
+            </div>
+
+            <div class="section status-card">
+              <i class="ph-bold ph-calendar-check status-icon"></i>
+              <span class="info-label">Today's Status</span>
+              <h1 id="todayStatus">Available</h1>
+              <p id="nextAvailable" style="font-size: 0.8rem; color: var(--text-gray); margin-top: 5px;">Take your interview now!</p>
+            </div>
+
             <div class="section">
               <span class="info-label">Total Interviews</span>
               <h1 id="totalSessions">0</h1>
@@ -187,16 +237,6 @@
             <div class="section">
               <span class="info-label">Average Score</span>
               <h1 id="avgScore">0</h1>
-            </div>
-
-            <div class="section">
-              <span class="info-label">Best Skill</span>
-              <h1 id="bestSkill">-</h1>
-            </div>
-
-            <div class="section">
-              <span class="info-label">Latest Score</span>
-              <h1 id="latestScore">-</h1>
             </div>
           </div>
         </div>

@@ -2,18 +2,16 @@ import os
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from flask_cors import CORS
 from flask_compress import Compress
-from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 from datetime import datetime
 import uuid
 import bcrypt
 from functools import wraps
-from langchain.chat_models import init_chat_model
 from Services.Genrator import InterviewGenratSession
 
 
 # ── DB helper (unchanged)
-from database_con import get_db_connection,StoreSession
+from database_con import get_db_connection, StoreSession, CheckDailyLimit, CreateSessionRecord, UpdateStreak, GetUserStreakInfo
 import io
 import PyPDF2
 
@@ -47,15 +45,6 @@ if not os.getenv("groq_Api"):
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 llm_service=InterviewGenratSession()
-llm = ChatGroq(
-    groq_api_key=os.getenv("groq_Api"),
-    model_name="llama-3.1-8b-instant",
-    temperature=0.7,
-)
-
-# ...
-
-
 
 
 # ============================================================
@@ -241,8 +230,37 @@ def get_feedback_api(session_id):
 # NEW ► START SESSION
 # ============================================================
 @app.route("/start-session", methods=["POST"])
+@login_required
 def start_session():
+    user_id = session.get("user_id")
+    
+    # Check if user already completed an interview today
+    if CheckDailyLimit(user_id):
+        return jsonify({
+            "success": False, 
+            "message": "You’ve already completed today’s interview. Come back tomorrow."
+        }), 403
+        
+    # Create or update session record to 'Started'
+    CreateSessionRecord(user_id, 'Started')
+    
     return jsonify({"success": True, "message": "Session started"})
+
+@app.route("/user-profile", methods=["GET"])
+@login_required
+def user_profile():
+    user_id = session.get("user_id")
+    streak_info = GetUserStreakInfo(user_id)
+    return jsonify({
+        "success": True,
+        "name": session.get("name"),
+        "streak_info": streak_info
+    })
+
+# Chrome DevTools occasionally pokes this path; silence the 404 log
+@app.route("/.well-known/appspecific/com.chrome.devtools.json")
+def chrome_devtools_json():
+    return jsonify({}), 200
 
 # Progress dashboard
 @app.route("/progress-dashboard",methods=["GET"])
@@ -513,6 +531,11 @@ def finish_interview():
             conn.close()
         except Exception as db_e:
             logger.error(f"DB Update Error in finish_interview for session {session_id}: {db_e}")
+
+        # Update streak and mark session as completed
+        user_id = session.get("user_id")
+        if user_id:
+            UpdateStreak(user_id)
 
         return jsonify({
             "status": "success",

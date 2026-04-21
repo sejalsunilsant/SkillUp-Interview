@@ -117,4 +117,124 @@ def GetFallbackQuestions(level, phase=None):
         logger.error(f"DB Error GetFallbackQuestions: {e}")
         return []
     finally:
-        if conn: conn.close()
+        if conn: conn.close()
+
+def CheckDailyLimit(user_id):
+    """Checks if the user has already completed an interview today"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = "SELECT id FROM sessions WHERE user_id = %s AND session_date = CURDATE() AND status = 'Completed'"
+        cursor.execute(query, (user_id,))
+        res = cursor.fetchone()
+        cursor.close()
+        return res is not None
+    except Exception as e:
+        logger.error(f"Error CheckDailyLimit: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
+def CreateSessionRecord(user_id, status='Started'):
+    """Creates a new entry in the sessions table for tracking daily attempts"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM sessions WHERE user_id = %s AND session_date = CURDATE()", (user_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            cursor.execute("UPDATE sessions SET status = %s WHERE id = %s", (status, existing[0]))
+        else:
+            query = "INSERT INTO sessions (user_id, session_date, status) VALUES (%s, CURDATE(), %s)"
+            cursor.execute(query, (user_id, status))
+            
+        conn.commit()
+        cursor.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error CreateSessionRecord: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
+def UpdateStreak(user_id):
+    """Updates the user's streak based on consecutive daily activity"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        from datetime import datetime, timedelta
+        
+        cursor.execute("SELECT streak_count, last_active_date FROM users WHERE user_id = %s", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user: return False
+        
+        streak = user.get('streak_count') or 0
+        last_date = user.get('last_active_date')
+        today = datetime.now().date()
+        
+        if last_date == today:
+            return True
+            
+        yesterday = today - timedelta(days=1)
+        
+        if last_date == yesterday:
+            streak += 1
+        else:
+            streak = 1
+            
+        cursor.execute("UPDATE users SET streak_count = %s, last_active_date = %s WHERE user_id = %s", 
+                       (streak, today, user_id))
+        
+        cursor.execute("UPDATE sessions SET status = 'Completed' WHERE user_id = %s AND session_date = %s", 
+                       (user_id, today))
+        
+        conn.commit()
+        cursor.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error UpdateStreak: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
+def GetUserStreakInfo(user_id):
+    """Retrieves streak and today's status for the user profile"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute("SELECT streak_count, last_active_date FROM users WHERE user_id = %s", (user_id,))
+        user = cursor.fetchone()
+        
+        cursor.execute("SELECT status FROM sessions WHERE user_id = %s AND session_date = CURDATE()", (user_id,))
+        session_today = cursor.fetchone()
+        
+        cursor.close()
+        
+        streak = user['streak_count'] if user and user['streak_count'] else 0
+        status = session_today['status'] if session_today else 'Available'
+        
+        # Calculate hours until tomorrow
+        from datetime import datetime, time, timedelta
+        now = datetime.now()
+        tomorrow_midnight = datetime.combine(now.date() + timedelta(days=1), time.min)
+        delta = tomorrow_midnight - now
+        hours_until = int(delta.total_seconds() // 3600)
+        
+        return {
+            "streak_count": streak,
+            "last_active_date": str(user['last_active_date']) if user and user['last_active_date'] else None,
+            "today_status": status,
+            "hours_until_next": hours_until
+        }
+    except Exception as e:
+        logger.error(f"Error GetUserStreakInfo: {e}")
+        return {"streak_count": 0, "last_active_date": None, "today_status": "Error", "hours_until_next": 0}
+    finally:
+        if conn: conn.close()
