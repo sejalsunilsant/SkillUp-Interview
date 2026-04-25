@@ -3,20 +3,19 @@
 // ============================================================
 class InterviewSessionClient {
   constructor(sessionData) {
-    this.session_id         = sessionData.session_id;
-    this.question_text      = sessionData.question;
+    this.session_id = sessionData.session_id;
+    this.question_text = sessionData.question;
     this.user_transcription = "";
-    this.topic              = sessionData.topic;
-    this.difficulty_level   = sessionData.difficulty_level;
-    this.timestamp          = sessionData.timestamp;
-    // Emotion data is now populated by polling /emotion-status
+    this.topic = sessionData.topic;
+    this.difficulty_level = sessionData.difficulty_level;
+    this.timestamp = sessionData.timestamp;
     this.posture_data = {
-      duration:         0,
-      stability:        "Initialising",
-      emotion:          "Neutral",
+      duration: 0,
+      stability: "Initialising",
+      emotion: "Neutral",
       dominant_emotion: "Neutral",
-      emotion_summary:  {},
-      notes:            "Emotion detector starting…",
+      emotion_summary: {},
+      notes: "Emotion detector starting…",
     };
   }
 
@@ -24,251 +23,337 @@ class InterviewSessionClient {
     this.user_transcription = text;
   }
 
-  // Called by the emotion polling loop
   updateEmotionData(data) {
     this.posture_data = {
-      duration:           data.duration          || 0,
-      stability:          data.stability         || "Unknown",
-      emotion:            data.emotion           || "Neutral",
-      dominant_emotion:   data.dominant_emotion  || "Neutral",
-      emotion_summary:    data.emotion_summary   || {},
-      all_probabilities:  data.all_probabilities || {},
-      notes:              data.notes             || "",
+      duration: data.duration || 0,
+      stability: data.stability || "Unknown",
+      emotion: data.emotion || "Neutral",
+      dominant_emotion: data.dominant_emotion || "Neutral",
+      emotion_summary: data.emotion_summary || {},
+      all_probabilities: data.all_probabilities || {},
+      notes: data.notes || "",
     };
   }
 
   toPayload() {
     return {
-      session_id:      this.session_id,
-      transcript:      this.user_transcription,
-      posture_data:    this.posture_data,
+      session_id: this.session_id,
+      transcript: this.user_transcription,
+      posture_data: this.posture_data,
     };
   }
 }
 
 // ============================================================
-// LOTTIE PLAYER AVATAR MANAGER (ROBUST VERSION)
+// AVATAR MANAGER — video (speaking) / image (idle + listening)
 // ============================================================
 class AvatarManager {
   constructor() {
     this.currentState = 'idle';
+
+    // IDs for <video> elements (shown while speaking)
     this.videoIds = ['hr-avatar-setup', 'hr-avatar-main'];
+
+    // IDs for <img> elements (shown while idle / listening)
     this.imageIds = ['hr-image-setup', 'hr-image-main'];
+
+    // IDs for the container (for ring-pulse CSS class)
+    this.containerIds = ['hr-container-setup', 'hr-container-main'];
+
+    // IDs for the text state labels
+    this.stateLabelIds = ['avatar-state-setup', 'avatar-state-main'];
   }
 
-  init(id) {
-    console.log(`[Avatar] Controller connected to: ${id}`);
-    this.setState('idle');
+  // ── Internal: show video, hide image ──────────────────────
+  _showVideo() {
+    this.videoIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('hr-media-hidden');
+      try {
+        el.currentTime = 0;
+        const playPromise = el.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => {
+            if (err.name !== 'AbortError') {
+              console.warn('[Avatar] Video play blocked:', err);
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('[Avatar] current time or play error:', e);
+      }
+    });
+    this.imageIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hr-media-hidden');
+    });
   }
 
+  // ── Internal: show image, hide video ──────────────────────
+  _showImage() {
+    this.imageIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('hr-media-hidden');
+    });
+    this.videoIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('hr-media-hidden');
+      try {
+        el.pause();
+        el.currentTime = 0;
+      } catch (e) {
+        console.warn('[Avatar] pause error:', e);
+      }
+    });
+  }
+
+  // ── Internal: update ring class on containers ─────────────
+  _setContainerClass(cls) {
+    // Find all containers by class (works even without explicit IDs)
+    const containers = document.querySelectorAll('.hr-visual-container');
+    containers.forEach(c => {
+      c.classList.remove('is-speaking', 'is-listening');
+      if (cls) c.classList.add(cls);
+    });
+  }
+
+  // ── Internal: update state label text ────────────────────
+  _setLabel(text, stateClass) {
+    this.stateLabelIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'avatar-state-label ' + (stateClass || 'state-idle');
+    });
+  }
+
+  // ── Public: initialise after DOM ready ───────────────────
+  init(id, initialState = 'speaking') {
+    console.log('[Avatar] Initialised, anchor:', id);
+    this.currentState = 'none'; // force re-trigger
+    this.setState(initialState);
+  }
+
+  // ── Public: transition to a new state ────────────────────
   setState(state) {
     if (this.currentState === state) return;
     this.currentState = state;
-    console.log(`[Avatar] Transitioning to: ${state}`);
+    console.log('[Avatar] State →', state);
 
-    const isSpeaking = (state === 'speaking');
+    switch (state) {
+      case 'speaking':
+        this._showVideo();
+        this._setContainerClass('is-speaking');
+        this._setLabel('Speaking…', 'state-speaking');
+        break;
 
-    // Toggle Videos
-    this.videoIds.forEach(id => {
-      const video = document.getElementById(id);
-      if (video) {
-        if (isSpeaking) {
-          video.classList.remove('hr-media-hidden');
-          video.play().catch(e => console.warn("[Avatar] Play blocked:", e));
-        } else {
-          video.classList.add('hr-media-hidden');
-          video.pause();
-          video.currentTime = 0;
-        }
-      }
-    });
+      case 'listening':
+        this._showImage();
+        this._setContainerClass('is-listening');
+        this._setLabel('Listening…', 'state-listening');
+        break;
 
-    // Toggle Images
-    this.imageIds.forEach(id => {
-      const img = document.getElementById(id);
-      if (img) {
-        if (!isSpeaking) {
-          img.classList.remove('hr-media-hidden');
-        } else {
-          img.classList.add('hr-media-hidden');
-        }
-      }
-    });
+      case 'idle':
+      default:
+        this._showImage();
+        this._setContainerClass(null);
+        this._setLabel('Ready', 'state-idle');
+        break;
+    }
   }
 
-  async speak(text) {
-    this.setState("speaking");
-    
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    const voices = window.speechSynthesis.getVoices();
-    const bestVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Female')));
-    if (bestVoice) utterance.voice = bestVoice;
+  // ── Public: speak text with word highlighting ─────────────
+  speak(text) {
+    if (!text || text.includes('Configuring')) return;
 
-    // Word highlighting logic
-    const display = document.getElementById("question-display");
+    this.setState('speaking');
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Pick best available voice
+    const voices = window.speechSynthesis.getVoices();
+    const bestVoice = voices.find(v =>
+      v.lang.startsWith('en') &&
+      (v.name.includes('Google') || v.name.includes('Female') || v.name.includes('Samantha'))
+    );
+    if (bestVoice) utterance.voice = bestVoice;
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+
+    // Word highlight
+    const display = document.getElementById('question-display');
     if (display) {
       const words = text.split(' ');
-      display.innerHTML = words.map(w => `<span>${w}</span>`).join(' ');
-      
+      display.innerHTML = words
+        .map(w => `<span style="opacity:0.5;transition:opacity 0.12s,font-weight 0.12s">${w}</span>`)
+        .join(' ');
+
       let wordIndex = 0;
       utterance.onboundary = (event) => {
         if (event.name === 'word') {
           const spans = display.querySelectorAll('span');
+          spans.forEach(s => {
+            s.style.opacity = '0.5';
+            s.style.fontWeight = '';
+          });
           if (spans[wordIndex]) {
-            spans.forEach(s => s.classList.remove('highlight'));
-            spans[wordIndex].classList.add('highlight');
+            spans[wordIndex].style.opacity = '1';
+            spans[wordIndex].style.fontWeight = '700';
             wordIndex++;
           }
         }
       };
     }
-    
+
     utterance.onend = () => {
-      this.setState("listening");
-      if (display) display.innerText = text; // Reset highlight but keep text
+      setTimeout(() => {
+        this.setState('listening');
+      }, 300);
     };
-    utterance.onerror = () => this.setState("listening");
+
+
+    utterance.onerror = (e) => {
+      console.warn('[Avatar] Speech error:', e.error);
+      this.setState('idle');
+      if (display) display.innerText = text;
+    };
 
     window.speechSynthesis.speak(utterance);
   }
 
-  startListening() { this.setState("listening"); }
-  stopListening() { this.setState("idle"); }
+  startListening() { this.setState('listening'); }
+  stopListening() { this.setState('idle'); }
 }
-
-
 
 // ============================================================
 // GLOBAL STATE
 // ============================================================
-let currentSession   = null;
-let recognition      = null;
-let videoStream      = null;
-let transcriptText   = "";
-let emotionPollTimer = null;   // replaces postureInterval
+let currentSession = null;
+let recognition = null;
+let videoStream = null;
+let transcriptText = "";
+let emotionPollTimer = null;
 let recordingStartTime = null;
-let timerInterval    = null;
-let isRecording      = false;
+let timerInterval = null;
+let isRecording = false;
 let localEmotionHistory = {};
 let emotionTotalFrames = 0;
+
 const avatarManager = new AvatarManager();
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
 
-// API ENDPOINTS
 const API_BASE = window.location.origin;
-console.log(`[Avatar] App initialized at: ${API_BASE}`);
+console.log('[SkillUp] App initialised at:', API_BASE);
 
 // ============================================================
-// INITIALIZATION
+// DOM READY
 // ============================================================
-document.addEventListener("DOMContentLoaded", async function () {
-  // Initialize Avatar
+document.addEventListener('DOMContentLoaded', async function () {
+
+  // Ensure voices load (some browsers need this event)
+  window.speechSynthesis.onvoiceschanged = () => {
+    console.log('[Speech] Voices loaded:', window.speechSynthesis.getVoices().length);
+  };
+
   avatarManager.init('hr-avatar-setup');
 
-  const diffSelect = document.getElementById("difficulty-select");
+  // Difficulty select sync
+  const diffSelect = document.getElementById('difficulty-select');
   if (diffSelect) {
-    diffSelect.addEventListener("change", function (e) {
-      document.getElementById("level-display").textContent =
-        e.target.options[e.target.selectedIndex].text;
+    diffSelect.addEventListener('change', function (e) {
+      const levelEl = document.getElementById('level-display');
+      if (levelEl) levelEl.textContent = e.target.options[e.target.selectedIndex].text;
     });
   }
 
-  // Fetch resume on load
+  // Load saved resume
   try {
     const res = await fetch(`${API_BASE}/api/profile/resume`);
     if (res.ok) {
       const data = await res.json();
-      const resumeTextEl = document.getElementById("resume-text");
-      if (resumeTextEl) {
-          resumeTextEl.value = data.resume_text || "";
-          resumeTextEl.placeholder = "Paste your resume text here or upload a PDF.";
+      const el = document.getElementById('resume-text');
+      if (el) {
+        el.value = data.resume_text || '';
+        el.placeholder = 'Paste your resume text here or upload a PDF.';
       }
     }
   } catch (e) {
-    console.error("Failed to fetch resume:", e);
+    console.error('Failed to fetch resume:', e);
   }
 
-  // Check daily limit and disable button if needed
+  // Check daily limit
   try {
     const statusRes = await fetch(`${API_BASE}/user-profile`);
     if (statusRes.ok) {
-        const profile = await statusRes.json();
-        if (profile.streak_info && profile.streak_info.today_status === 'Completed') {
-            const startBtn = document.querySelector('button[onclick="startInterview()"]');
-            if (startBtn) {
-                startBtn.disabled = true;
-                startBtn.innerHTML = "🏆 Today's Interview Completed";
-                startBtn.style.opacity = "0.7";
-                startBtn.style.cursor = "not-allowed";
-                startBtn.style.background = "linear-gradient(135deg, #48cfad 0%, #1abc9c 100%)";
-                
-                const introBox = document.querySelector('.avatar-intro');
-                if (introBox) {
-                    introBox.innerText = "You’ve already completed today’s interview. Come back tomorrow!";
-                    introBox.style.color = "#48cfad";
-                }
-            }
+      const profile = await statusRes.json();
+      if (profile.streak_info && profile.streak_info.today_status === 'Completed') {
+        const startBtn = document.querySelector('button[onclick="startInterview()"]');
+        if (startBtn) {
+          startBtn.disabled = true;
+          startBtn.innerHTML = '🏆 Today\'s Interview Completed';
+          startBtn.style.opacity = '0.7';
+          startBtn.style.cursor = 'not-allowed';
+          startBtn.style.background = 'linear-gradient(135deg, #48cfad 0%, #1abc9c 100%)';
         }
+        const introBox = document.querySelector('.avatar-intro');
+        if (introBox) {
+          introBox.innerText = "You've already completed today's interview. Come back tomorrow!";
+          introBox.style.color = '#48cfad';
+        }
+      }
     }
   } catch (e) {
-      console.error("Failed to check daily limit:", e);
+    console.error('Failed to check daily limit:', e);
   }
 });
 
+// ============================================================
+// RESUME SAVE / UPLOAD
+// ============================================================
 async function saveResume() {
-  const resumeText = document.getElementById("resume-text").value;
-  const statusEl = document.getElementById("resume-status");
-  statusEl.textContent = "Saving...";
+  const resumeText = document.getElementById('resume-text').value;
+  const statusEl = document.getElementById('resume-status');
+  statusEl.textContent = 'Saving...';
   try {
     const res = await fetch(`${API_BASE}/api/profile/resume`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resume_text: resumeText })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume_text: resumeText }),
     });
-    if (res.ok) {
-      statusEl.textContent = "Saved!";
-      setTimeout(() => statusEl.textContent = "", 2000);
-    } else {
-      statusEl.textContent = "Failed to save.";
-    }
+    statusEl.textContent = res.ok ? 'Saved!' : 'Failed to save.';
+    if (res.ok) setTimeout(() => (statusEl.textContent = ''), 2000);
   } catch (e) {
-    console.error("Save resume error:", e);
-    statusEl.textContent = "Error saving.";
+    console.error('Save resume error:', e);
+    statusEl.textContent = 'Error saving.';
   }
 }
 
 async function uploadResumeFile(event) {
   const file = event.target.files[0];
   if (!file) return;
-  
-  const statusEl = document.getElementById("resume-status");
-  statusEl.textContent = "Uploading & Extracting...";
-  
+  const statusEl = document.getElementById('resume-status');
+  statusEl.textContent = 'Uploading & Extracting...';
   const formData = new FormData();
-  formData.append("resume", file);
-  
+  formData.append('resume', file);
   try {
-    const res = await fetch(`${API_BASE}/api/profile/resume`, {
-      method: "POST",
-      body: formData
-    });
+    const res = await fetch(`${API_BASE}/api/profile/resume`, { method: 'POST', body: formData });
     if (res.ok) {
-      // Refresh textarea
       const fetchRes = await fetch(`${API_BASE}/api/profile/resume`);
       const data = await fetchRes.json();
-      document.getElementById("resume-text").value = data.resume_text;
-      statusEl.textContent = "Extracted and Saved!";
-      setTimeout(() => statusEl.textContent = "", 2000);
+      document.getElementById('resume-text').value = data.resume_text;
+      statusEl.textContent = 'Extracted and Saved!';
+      setTimeout(() => (statusEl.textContent = ''), 2000);
     } else {
-      statusEl.textContent = "Failed to process PDF.";
+      statusEl.textContent = 'Failed to process PDF.';
     }
   } catch (e) {
-    console.error("Upload resume error:", e);
-    statusEl.textContent = "Error parsing PDF.";
+    console.error('Upload resume error:', e);
+    statusEl.textContent = 'Error parsing PDF.';
   }
 }
 
@@ -276,228 +361,229 @@ async function uploadResumeFile(event) {
 // START INTERVIEW
 // ============================================================
 async function startInterview() {
-  const jd         = document.getElementById("jd-input").value.trim();
-  const difficulty = document.getElementById("difficulty-select").value;
+  const jd = document.getElementById('jd-input').value.trim();
+  const difficulty = document.getElementById('difficulty-select').value;
 
-  if (!jd) {
-    alert("Please enter a job description");
-    return;
-  }
+  if (!jd) { alert('Please enter a job description'); return; }
 
-  showLoading(true, "Initializing local facial analysis...");
+  showLoading(true, 'Initialising local facial analysis…');
+  avatarManager.setState('speaking');
 
   try {
+    // Load face-api models
     const MODEL_URL = '/static/models/';
     await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
     await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
 
-    // ── 1. Boot Python emotion detector (optional cleanup/state) ──────────────────────────────────────
+    // Boot backend session
     const startRes = await fetch(`${API_BASE}/start-session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     });
-    
+
     if (startRes.status === 403) {
-        const data = await startRes.json();
-        alert(data.message);
-        showLoading(false);
-        return;
+      const data = await startRes.json();
+      alert(data.message);
+      showLoading(false);
+      return;
     }
-    
-    if (!startRes.ok) throw new Error("Failed to start session backend");
 
-    showLoading(true, "Generating your first interview question…");
+    if (!startRes.ok) throw new Error('Failed to start session backend');
 
-    // ── 2. Fetch question & create session using JSON ─────────────────────
+    showLoading(true, 'Generating your first interview question…');
+
+    // Fetch first question
     const res = await fetch(`${API_BASE}/hr-questions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jd: jd, level: difficulty })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jd, level: difficulty }),
     });
     if (!res.ok) throw new Error(await res.text());
 
-    const data     = await res.json();
+    const data = await res.json();
     currentSession = new InterviewSessionClient(data);
 
-    // ── 3. Update UI ──────────────────────────────────────────────────────────
     updateInterviewUI(data);
 
-    // ── 4. Camera (display only – Python handles analysis) ───────────────────
     await startCamera();
 
-    // ── 5. Start emotion polling ──────────────────────────────────────────────
     startEmotionPolling();
 
-    document.getElementById("setup-section").style.display = "none";
-    document.getElementById("main-grid").classList.remove("hidden");
-    
-    // Initialize main avatar
-  avatarManager.init('hr-avatar-main');
+    document.getElementById('setup-section').style.display = 'none';
+    document.getElementById('main-grid').classList.remove('hidden');
+
+    // Re-init avatar for the main grid
+    avatarManager.init('hr-avatar-main');
 
   } catch (e) {
-    console.error("Interview start error:", e);
-    alert("Failed to start interview. Please try again.");
+    console.error('Interview start error:', e);
+    alert('Failed to start interview. Please try again.');
   }
 
   showLoading(false);
 }
 
 function updateInterviewUI(data) {
-    document.getElementById("question-display").innerText  = data.question;
-    document.getElementById("topic-display").innerText     = data.topic;
-    document.getElementById("level-display").innerText     = data.difficulty_level;
-    document.getElementById("session-display").innerText   =
-      data.session_id.substring(0, 8) + "…";
-    
-    // Clear previous transcript and feedback
-    document.getElementById("transcript-display").innerText = "Click \"Start Recording\" to begin transcription…";
-    document.getElementById("feedback-section").classList.add("hidden");
+  document.getElementById('question-display').innerText = data.question;
+  document.getElementById('topic-display').innerText = data.topic;
+  document.getElementById('level-display').innerText = data.difficulty_level;
+  document.getElementById('session-display').innerText =
+    data.session_id.substring(0, 8) + '…';
 
-    // Automatically speak the new question
-    setTimeout(() => speakQuestion(), 500);
+  document.getElementById('transcript-display').innerText =
+    'Click "Start Recording" to begin transcription…';
+  document.getElementById('feedback-section').classList.add('hidden');
+
+  // DON'T set to idle here — we want to stay in speaking mode while the question appears
+  // and then speakQuestion() will handle the transition back to listening after finishing.
+
+  // Auto-speak new question
+  setTimeout(() => speakQuestion(), 500);
 }
 
 async function nextQuestion() {
-    const difficulty = document.getElementById("difficulty-select").value;
-    showLoading(true, "Generating next question…");
-    
-    try {
-        // Stop current session polling and recording if active
-        if (recognition) recognition.stop();
-        stopEmotionPolling();
-        
-        // Fetch new question (backend uses session-stored JD/Resume)
-        const res = await fetch(`${API_BASE}/hr-questions`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ level: difficulty, session_id: currentSession ? currentSession.session_id : null })
-        });
-        
-        if (!res.ok) throw new Error("Failed to fetch next question");
-        
-        const data = await res.json();
-        currentSession = new InterviewSessionClient(data);
-        
-        // Update UI
-        updateInterviewUI(data);
-        
-        // Restart emotion polling for new question
-        startEmotionPolling();
-        
-        // Scroll to question
-        document.querySelector(".question-section").scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-        
-    } catch (e) {
-        console.error("Next question error:", e);
-        alert("Failed to get next question. Please try again.");
-    }
-    
-    showLoading(false);
+  const difficulty = document.getElementById('difficulty-select').value;
+  showLoading(true, 'Generating next question…');
+  avatarManager.setState('speaking');
+
+  try {
+    if (recognition) recognition.stop();
+    stopEmotionPolling();
+
+    const res = await fetch(`${API_BASE}/hr-questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        level: difficulty,
+        session_id: currentSession ? currentSession.session_id : null,
+      }),
+    });
+
+    if (!res.ok) throw new Error('Failed to fetch next question');
+
+    const data = await res.json();
+    currentSession = new InterviewSessionClient(data);
+
+    updateInterviewUI(data);
+    startEmotionPolling();
+
+    document.querySelector('.question-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch (e) {
+    console.error('Next question error:', e);
+    alert('Failed to get next question. Please try again.');
+  }
+
+  showLoading(false);
 }
 
 // ============================================================
-// CAMERA  (display only – no JS analysis)
+// CAMERA
 // ============================================================
 async function startCamera() {
   try {
     videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    const video = document.getElementById("video");
+    const video = document.getElementById('video');
     video.srcObject = videoStream;
     await video.play();
-    updateStatusBadge("posture-status", "Camera Active", "status-active");
+    updateStatusBadge('posture-status', 'Camera Active', 'status-active');
   } catch (err) {
-    console.error("Camera error:", err);
-    updateStatusBadge("posture-status", "Camera Error", "status-error");
-    alert("Camera access denied. Please enable camera permissions.");
+    console.error('Camera error:', err);
+    updateStatusBadge('posture-status', 'Camera Error', 'status-error');
+    alert('Camera access denied. Please enable camera permissions.');
   }
 }
 
 // ============================================================
-// EMOTION POLLING  — browser uses face-api.js locally
+// EMOTION POLLING (browser face-api.js)
 // ============================================================
 function startEmotionPolling() {
   if (emotionPollTimer) clearInterval(emotionPollTimer);
-
   localEmotionHistory = {};
   emotionTotalFrames = 0;
 
   emotionPollTimer = setInterval(async () => {
-    const video = document.getElementById("video");
+    const video = document.getElementById('video');
     if (!video || video.readyState < 2 || video.videoWidth === 0) return;
 
     try {
-      const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceExpressions();
+
       let data = {};
+
       if (detection) {
-        // Find dominant emotion
         const expressions = detection.expressions;
-        let maxEmotion = "neutral";
-        let maxScore = 0;
+        let maxEmotion = 'neutral', maxScore = 0;
         for (const [emo, score] of Object.entries(expressions)) {
-          if (score > maxScore) {
-            maxScore = score;
-            maxEmotion = emo;
-          }
+          if (score > maxScore) { maxScore = score; maxEmotion = emo; }
         }
-        
+
         emotionTotalFrames++;
         localEmotionHistory[maxEmotion] = (localEmotionHistory[maxEmotion] || 0) + 1;
-        
-        let dominant_overall = "neutral";
-        let max_overall = 0;
+
+        let dominant_overall = 'neutral', max_overall = 0;
         let emotion_summary = {};
         for (const [emo, count] of Object.entries(localEmotionHistory)) {
           const pct = Math.round((count / emotionTotalFrames) * 100);
           emotion_summary[emo] = pct;
-          if (count > max_overall) {
-            max_overall = count;
-            dominant_overall = emo;
-          }
+          if (count > max_overall) { max_overall = count; dominant_overall = emo; }
         }
-        
+
         data = {
           emotion: maxEmotion,
           confidence: +(maxScore * 100).toFixed(1),
           face_detected: true,
           all_probabilities: expressions,
           dominant_emotion: dominant_overall,
-          emotion_summary: emotion_summary,
-          stability: "Active",
-          notes: "Analyzed locally",
-          duration: timerInterval ? Math.floor((Date.now() - recordingStartTime) / 1000) : 0,
+          emotion_summary,
+          stability: 'Active',
+          notes: 'Analysed locally',
+          duration: timerInterval
+            ? Math.floor((Date.now() - recordingStartTime) / 1000)
+            : 0,
         };
+
       } else {
         data = {
-          emotion: "Unknown",
+          emotion: 'Unknown',
           confidence: 0,
           face_detected: false,
           all_probabilities: {},
-          dominant_emotion: currentSession ? currentSession.posture_data.dominant_emotion : "Unknown",
-          emotion_summary: currentSession ? currentSession.posture_data.emotion_summary : {},
-          stability: "Face not detected",
-          notes: "No face found",
-          duration: timerInterval ? Math.floor((Date.now() - recordingStartTime) / 1000) : 0,
+          dominant_emotion: currentSession
+            ? currentSession.posture_data.dominant_emotion
+            : 'Unknown',
+          emotion_summary: currentSession
+            ? currentSession.posture_data.emotion_summary
+            : {},
+          stability: 'Face not detected',
+          notes: 'No face found',
+          duration: timerInterval
+            ? Math.floor((Date.now() - recordingStartTime) / 1000)
+            : 0,
         };
       }
 
       if (currentSession) currentSession.updateEmotionData(data);
 
-      const coach    = getCoaching(data.emotion);
-      const label    = data.face_detected
-        ? `${coach.icon} ${data.emotion} — ${coach.tip.split("—")[0].split(".")[0]}`
-        : `👤 No Face Detected`;
-      updateStatusBadge("posture-status", label, data.face_detected ? "status-active" : "status-warning");
+      const coach = getCoaching(data.emotion);
+      const label = data.face_detected
+        ? `${coach.icon} ${data.emotion} — ${coach.tip.split('—')[0].split('.')[0]}`
+        : '👤 No Face Detected';
+      updateStatusBadge(
+        'posture-status',
+        label,
+        data.face_detected ? 'status-active' : 'status-warning'
+      );
 
-      const emotionPanel = document.getElementById("emotion-panel");
-      if (emotionPanel) emotionPanel.innerHTML = buildEmotionPanelHTML(data);
+      const panel = document.getElementById('emotion-panel');
+      if (panel) panel.innerHTML = buildEmotionPanelHTML(data);
 
     } catch (err) {
-      console.error("Local face-api error:", err);
+      console.error('face-api error:', err);
     }
-  }, 1000);  // analyze every 1 second
+  }, 1000);
 }
 
 function stopEmotionPolling() {
@@ -507,111 +593,60 @@ function stopEmotionPolling() {
   }
 }
 
-// Coaching tips keyed by detected emotion
+// ── Coaching data ──────────────────────────────────────────
 const EMOTION_COACHING = {
-  angry:     {
-    icon:  "😤",
-    tip:   "Take a slow breath — relax your jaw and shoulders.",
-    extra: "Interviewers respond best to calm, measured answers. Pause before speaking.",
-    color: "#ff6b6b",
-  },
-  disgust:   {
-    icon:  "😒",
-    tip:   "Soften your expression — try a gentle, neutral face.",
-    extra: "Even a slight frown can read as disinterest. Aim for open, curious eyes.",
-    color: "#f39c12",
-  },
-  fear:      {
-    icon:  "😨",
-    tip:   "You've got this! Breathe deeply and stand tall.",
-    extra: "Anxiety is normal — channel it into enthusiasm for the topic.",
-    color: "#9b59b6",
-  },
-  sad:       {
-    icon:  "😔",
-    tip:   "Lift your chin and bring energy into your voice.",
-    extra: "A warm, upbeat tone signals confidence even when nerves creep in.",
-    color: "#3498db",
-  },
-  surprise:  {
-    icon:  "😲",
-    tip:   "Steady your expression — show composed confidence.",
-    extra: "Wide eyes or raised brows can look unsure. Settle into a calm, ready look.",
-    color: "#1abc9c",
-  },
-  neutral:   {
-    icon:  "😐",
-    tip:   "Add a little warmth — a gentle smile goes a long way!",
-    extra: "Engaged eye contact and small nods show the interviewer you're present.",
-    color: "#7f8c8d",
-  },
-  happy:     {
-    icon:  "😊",
-    tip:   "Great energy! Keep smiling and stay confident.",
-    extra: "Your positivity is coming through — maintain this throughout your answer.",
-    color: "#2ecc71",
-  },
+  angry: { icon: '😤', tip: 'Take a slow breath — relax your jaw and shoulders.', extra: 'Interviewers respond best to calm, measured answers. Pause before speaking.', color: '#ff6b6b' },
+  disgust: { icon: '😒', tip: 'Soften your expression — try a gentle, neutral face.', extra: 'Even a slight frown can read as disinterest. Aim for open, curious eyes.', color: '#f39c12' },
+  fear: { icon: '😨', tip: "You've got this! Breathe deeply and stand tall.", extra: 'Anxiety is normal — channel it into enthusiasm for the topic.', color: '#9b59b6' },
+  sad: { icon: '😔', tip: 'Lift your chin and bring energy into your voice.', extra: 'A warm, upbeat tone signals confidence even when nerves creep in.', color: '#3498db' },
+  surprise: { icon: '😲', tip: 'Steady your expression — show composed confidence.', extra: 'Wide eyes or raised brows can look unsure. Settle into a calm, ready look.', color: '#1abc9c' },
+  neutral: { icon: '😐', tip: 'Add a little warmth — a gentle smile goes a long way!', extra: 'Engaged eye contact and small nods show the interviewer you\'re present.', color: '#7f8c8d' },
+  happy: { icon: '😊', tip: 'Great energy! Keep smiling and stay confident.', extra: 'Your positivity is coming through — maintain this throughout your answer.', color: '#2ecc71' },
 };
 
 function getCoaching(emotion) {
-  const key = (emotion || "neutral").toLowerCase();
-  return EMOTION_COACHING[key] || EMOTION_COACHING["neutral"];
+  const key = (emotion || 'neutral').toLowerCase();
+  return EMOTION_COACHING[key] || EMOTION_COACHING['neutral'];
 }
 
-/** Build coaching-instruction panel instead of raw emotion bars */
 function buildEmotionPanelHTML(data) {
-  const emotion  = data.emotion || "neutral";
-  const coach    = getCoaching(emotion);
+  const emotion = data.emotion || 'neutral';
+  const coach = getCoaching(emotion);
   const dominant = data.dominant_emotion || emotion;
   const domCoach = getCoaching(dominant);
 
-  // Emotion history bars (kept small, secondary)
   const rows = Object.entries(data.emotion_summary || {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
     .map(([e, pct]) =>
       `<div class="emotion-row">
          <span class="emotion-label">${e}</span>
-         <div class="emotion-bar-wrap">
-           <div class="emotion-bar" style="width:${pct}%"></div>
-         </div>
+         <div class="emotion-bar-wrap"><div class="emotion-bar" style="width:${pct}%"></div></div>
          <span class="emotion-pct">${pct}%</span>
        </div>`
-    ).join("");
+    ).join('');
 
   return `
     <div class="emotion-summary">
-
-      <!-- Live coaching instruction -->
-      <div style="
-        background: rgba(255,255,255,0.04);
-        border-left: 3px solid ${coach.color};
-        border-radius: 6px;
-        padding: 10px 12px;
-        margin-bottom: 10px;
-      ">
-        <div style="font-size:1.2rem; margin-bottom:4px;">${coach.icon}
-          <strong style="color:${coach.color}; font-size:0.85rem; margin-left:4px;">
+      <div style="background:rgba(255,255,255,0.04);border-left:3px solid ${coach.color};
+                  border-radius:6px;padding:10px 12px;margin-bottom:10px;">
+        <div style="font-size:1.2rem;margin-bottom:4px;">
+          ${coach.icon}
+          <strong style="color:${coach.color};font-size:0.85rem;margin-left:4px;">
             ${emotion.charAt(0).toUpperCase() + emotion.slice(1)} detected
           </strong>
         </div>
-        <div style="color:#e0e0f0; font-size:0.88rem; font-weight:600; margin-bottom:3px;">
+        <div style="color:#e0e0f0;font-size:0.88rem;font-weight:600;margin-bottom:3px;">
           ${coach.tip}
         </div>
-        <div style="color:#9999bb; font-size:0.80rem;">
-          ${coach.extra}
-        </div>
+        <div style="color:#9999bb;font-size:0.80rem;">${coach.extra}</div>
       </div>
-
-      <!-- Dominant-emotion coaching (if different from live) -->
       ${dominant.toLowerCase() !== emotion.toLowerCase() ? `
-      <div style="font-size:0.78rem; color:#888aaa; margin-bottom:8px;">
-        📊 Session trend: <strong style="color:${domCoach.color}">${dominant}</strong>
-        — ${domCoach.tip}
-      </div>` : ""}
-
-      <!-- History breakdown bars -->
-      ${rows ? `<div style="margin-top:6px;">${rows}</div>` : ""}
+        <div style="font-size:0.78rem;color:#888aaa;margin-bottom:8px;">
+          📊 Session trend: <strong style="color:${domCoach.color}">${dominant}</strong>
+          — ${domCoach.tip}
+        </div>` : ''}
+      ${rows ? `<div style="margin-top:6px;">${rows}</div>` : ''}
     </div>`;
 }
 
@@ -620,68 +655,64 @@ function buildEmotionPanelHTML(data) {
 // ============================================================
 function startRecording() {
   if (!SpeechRecognition) {
-    alert("Speech Recognition not supported. Please use Chrome or Edge.");
+    alert('Speech Recognition not supported. Please use Chrome or Edge.');
     return;
   }
   if (!currentSession) {
-    alert("Please start an interview session first");
+    alert('Please start an interview session first');
     return;
   }
 
-  // Visual sync
+  // Avatar enters listening mode
   avatarManager.startListening();
 
   recognition = new SpeechRecognition();
   recognition.continuous = true;
-  recognition.interimResults= true;
-  transcriptText     = "";
+  recognition.interimResults = true;
+  transcriptText = '';
   recordingStartTime = Date.now();
 
   recognition.onresult = (e) => {
-    let interimTranscript = "";
-    let finalTranscript   = transcriptText;
+    let interimTranscript = '';
+    let finalTranscript = transcriptText;
 
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       if (e.results[i].isFinal) {
-        finalTranscript += t + " ";
+        finalTranscript += t + ' ';
       } else {
         interimTranscript += t;
       }
     }
 
     transcriptText = finalTranscript;
-    document.getElementById("transcript-display").innerText =
-      (finalTranscript + interimTranscript) || "Listening…";
+    document.getElementById('transcript-display').innerText =
+      (finalTranscript + interimTranscript) || 'Listening…';
 
     currentSession.updateTranscription(transcriptText.trim());
   };
 
   recognition.onerror = (e) => {
-    console.error("Recognition error:", e.error);
-    if (e.error === "no-speech") {
-      updateStatusBadge("transcript-status", "No speech detected (will keep listening)", "status-warning");
-    } else if (e.error === "not-allowed" || e.error === "audio-capture") {
+    console.error('Recognition error:', e.error);
+    if (e.error === 'no-speech') {
+      updateStatusBadge('transcript-status', 'No speech detected (will keep listening)', 'status-warning');
+    } else if (e.error === 'not-allowed' || e.error === 'audio-capture') {
       isRecording = false;
-      updateStatusBadge("transcript-status", "Microphone error or permission denied", "status-error");
+      updateStatusBadge('transcript-status', 'Microphone error or permission denied', 'status-error');
       toggleRecording(false);
       stopTimer();
     }
   };
 
   recognition.onend = () => {
-    console.log("Speech recognition ended.");
+    console.log('[Speech] Recognition ended.');
     if (isRecording) {
-      console.log("Restarting speech recognition...");
       setTimeout(() => {
         if (isRecording) {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error("Failed to restart recording:", e);
-          }
+          try { recognition.start(); }
+          catch (e) { console.error('Failed to restart recording:', e); }
         }
-      }, 250); // Small delay to prevent 'already started' DOMException
+      }, 250);
     }
   };
 
@@ -690,13 +721,10 @@ function startRecording() {
     recognition.start();
     toggleRecording(true);
     startTimer();
-    updateStatusBadge("transcript-status", "Recording…", "status-recording");
-    
-    // Set avatar to listening state
-    avatarManager.setState('listening');
+    updateStatusBadge('transcript-status', 'Recording…', 'status-recording');
   } catch (e) {
-    console.error("Failed to start recording:", e);
-    alert("Failed to start recording. Please try again.");
+    console.error('Failed to start recording:', e);
+    alert('Failed to start recording. Please try again.');
   }
 }
 
@@ -706,18 +734,17 @@ async function stopRecording() {
 
   stopTimer();
   stopEmotionPolling();
-
   toggleRecording(false);
-  updateStatusBadge("transcript-status", "Processing…", "status-processing");
-  
-  // Visual sync
+  updateStatusBadge('transcript-status', 'Processing…', 'status-processing');
+
+  // Avatar back to idle
   avatarManager.stopListening();
 
   currentSession.updateTranscription(transcriptText.trim());
 
   if (!transcriptText.trim()) {
-    alert("No transcription detected. Please try recording again.");
-    updateStatusBadge("transcript-status", "Ready", "status-inactive");
+    alert('No transcription detected. Please try recording again.');
+    updateStatusBadge('transcript-status', 'Ready', 'status-inactive');
     return;
   }
 
@@ -728,55 +755,50 @@ async function stopRecording() {
 // ANALYSIS
 // ============================================================
 async function analyzeResponse() {
-  showLoading(true, "Saving your response…");
+  showLoading(true, 'Saving your response…');
 
   try {
     const payload = currentSession.toPayload();
-    console.log("Sending structured payload:", payload);
+    console.log('[Submit] Payload:', payload);
 
     const res = await fetch(`${API_BASE}/submit-answer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error("Analysis failed");
+    if (!res.ok) throw new Error('Analysis failed');
 
-    const data = await res.json();
-
-    document.getElementById("feedback-display").innerHTML =
-      "<b>Response Saved Successfully!</b><br><br>Click <i>Next Question</i> to proceed or click <i>Finish Interview</i> if you are ready to evaluate your overall performance.";
-    document.getElementById("feedback-section").classList.remove("hidden");
-    document.getElementById("feedback-section").scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    document.getElementById('feedback-display').innerHTML =
+      '<b>Response Saved Successfully!</b><br><br>' +
+      'Click <i>Next Question</i> to proceed or click <i>Finish Interview</i> ' +
+      'if you are ready to evaluate your overall performance.';
+    document.getElementById('feedback-section').classList.remove('hidden');
+    document.getElementById('feedback-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   } catch (e) {
-    console.error("Submission error:", e);
-    alert("Failed to save response. Please try again.");
+    console.error('Submission error:', e);
+    alert('Failed to save response. Please try again.');
   }
 
   showLoading(false);
-  updateStatusBadge("transcript-status", "Answer Saved", "status-active");
+  updateStatusBadge('transcript-status', 'Answer Saved', 'status-active');
 }
 
 async function finishInterview() {
-  showLoading(true, "Compiling your final comprehensive HR Evaluation… (This may take up to 2 minutes)");
+  showLoading(true, 'Compiling your final comprehensive HR Evaluation… (This may take up to 2 minutes)');
   try {
     const res = await fetch(`${API_BASE}/finish-interview`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ session_id: currentSession.session_id })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: currentSession.session_id }),
     });
-    
-    if (!res.ok) throw new Error("Failed evaluating");
+
+    if (!res.ok) throw new Error('Failed evaluating');
     const data = await res.json();
-    
-    // Redirect to the new feedback page
     window.location.href = `/feedback/${data.session_id}`;
-  } catch(e) {
-    alert("Error fetching final performance review.");
+  } catch (e) {
+    alert('Error fetching final performance review.');
   }
   showLoading(false);
 }
@@ -785,109 +807,95 @@ async function finishInterview() {
 // UTILITY FUNCTIONS
 // ============================================================
 function startTimer() {
-  const timerElement = document.getElementById("recording-timer");
-  timerElement.classList.remove("hidden");
-
+  document.getElementById('recording-timer').classList.remove('hidden');
   timerInterval = setInterval(() => {
     const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-    const mm = Math.floor(elapsed / 60).toString().padStart(2, "0");
-    const ss = (elapsed % 60).toString().padStart(2, "0");
-    document.getElementById("timer-display").textContent = `${mm}:${ss}`;
-    if (currentSession) {
-      currentSession.posture_data.duration = elapsed;
-    }
+    const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
+    const ss = (elapsed % 60).toString().padStart(2, '0');
+    document.getElementById('timer-display').textContent = `${mm}:${ss}`;
+    if (currentSession) currentSession.posture_data.duration = elapsed;
   }, 1000);
 }
 
 function stopTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
-  document.getElementById("recording-timer").classList.add("hidden");
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  document.getElementById('recording-timer').classList.add('hidden');
 }
 
 function toggleRecording(recording) {
-  document.getElementById("record-btn").classList.toggle("hidden", recording);
-  document.getElementById("stop-btn").classList.toggle("hidden", !recording);
-  document.getElementById("recording-indicator").classList.toggle("hidden", !recording);
+  document.getElementById('record-btn').classList.toggle('hidden', recording);
+  document.getElementById('stop-btn').classList.toggle('hidden', !recording);
+  document.getElementById('recording-indicator').classList.toggle('hidden', !recording);
 }
 
 function updateStatusBadge(elementId, text, statusClass) {
   const el = document.getElementById(elementId);
-  if (el) {
-    el.textContent = text;
-    el.className   = "status-badge " + statusClass;
-  }
+  if (el) { el.textContent = text; el.className = 'status-badge ' + statusClass; }
 }
 
-function showLoading(show, text = "Processing…") {
-  const loadingEl = document.getElementById("loading");
+function showLoading(show, text = 'Processing…') {
+  const loadingEl = document.getElementById('loading');
   if (show) {
-    loadingEl.classList.remove("hidden");
-    document.querySelector(".loading-text").textContent = text;
+    loadingEl.classList.remove('hidden');
+    document.querySelector('.loading-text').textContent = text;
   } else {
-    loadingEl.classList.add("hidden");
+    loadingEl.classList.add('hidden');
   }
 }
 
 function formatFeedback(feedback) {
   return feedback
-    .replace(/## (.*?)(\n|$)/g, "<h3>$1</h3>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/- (.*?)(\n|$)/g, "<li>$1</li>")
-    .replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>")
-    .replace(/\n/g, "<br>");
+    .replace(/## (.*?)(\n|$)/g, '<h3>$1</h3>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/- (.*?)(\n|$)/g, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
+    .replace(/\n/g, '<br>');
 }
 
 async function resetInterview() {
-  // Stop all streams
   isRecording = false;
-  if (videoStream)      videoStream.getTracks().forEach((t) => t.stop());
-  if (recognition)      recognition.stop();
+  if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+  if (recognition) recognition.stop();
   stopEmotionPolling();
   stopTimer();
 
-  // Tell backend to stop detector
-  try {
-    await fetch(`${API_BASE}/stop-session`, { method: "POST" });
-  } catch (_) {}
+  try { await fetch(`${API_BASE}/stop-session`, { method: 'POST' }); } catch (_) { }
 
   currentSession = null;
-  transcriptText = "";
+  transcriptText = '';
   location.reload();
 }
 
 // ============================================================
-// VOICE SYNTHESIS (Speak Question)
+// VOICE SYNTHESIS
 // ============================================================
 function speakQuestion() {
-  const text = document.getElementById("question-display").innerText;
-  if (text && !text.includes("Configuring")) {
+  const text = document.getElementById('question-display').innerText;
+
+  if (!text || text.includes('Configuring')) return;
+
+  // FORCE speaking state BEFORE speech starts
+  avatarManager.setState('speaking');
+
+  // small delay ensures UI updates before audio starts
+  setTimeout(() => {
     avatarManager.speak(text);
-  }
+  }, 200);
 }
 
 
-
-/** Stop ongoing speech synthesis */
 function stopSpeaking() {
   if (window.speechSynthesis.speaking) {
     window.speechSynthesis.cancel();
-    const btn = document.getElementById("speak-btn");
-    if (btn) btn.classList.remove("speaking");
+    const btn = document.getElementById('speak-btn');
+    if (btn) btn.classList.remove('speaking');
     avatarManager.setState('idle');
-    console.log("Speech stopped by user.");
+    console.log('[Speech] Stopped by user.');
   }
 }
 
-// Ensure voices are loaded (some browsers need this)
-window.speechSynthesis.onvoiceschanged = () => {
-  console.log("Speech synthesis voices loaded.");
-};
-
 // ============================================================
-// ERROR HANDLING
+// GLOBAL ERROR HANDLING
 // ============================================================
-window.addEventListener("error", (e)              => console.error("Global error:", e.error));
-window.addEventListener("unhandledrejection", (e)  => console.error("Unhandled rejection:", e.reason));
+window.addEventListener('error', e => console.error('Global error:', e.error));
+window.addEventListener('unhandledrejection', e => console.error('Unhandled rejection:', e.reason));

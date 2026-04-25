@@ -62,6 +62,54 @@ class ActiveInterview:
         self.current_stage    = "Introduction"
         self.timestamp        = datetime.utcnow().isoformat()
 
+    def to_dict(self):
+        return {
+            "session_id": self.session_id,
+            "jd_text": self.jd_text,
+            "resume_text": self.resume_text,
+            "difficulty_level": self.difficulty_level,
+            "question_count": self.question_count,
+            "history": self.history,
+            "current_question": self.current_question,
+            "current_stage": self.current_stage,
+            "timestamp": self.timestamp
+        }
+
+    @staticmethod
+    def from_dict(d):
+        obj = ActiveInterview(d["jd_text"], d["resume_text"], d["difficulty_level"])
+        obj.session_id = d["session_id"]
+        obj.question_count = d["question_count"]
+        obj.history = d["history"]
+        obj.current_question = d["current_question"]
+        obj.current_stage = d["current_stage"]
+        obj.timestamp = d["timestamp"]
+        return obj
+
+from database_con import SaveInterviewState, LoadInterviewState
+import json
+
+def get_active_interview(session_id):
+    """Refactored to check memory first, then DB for stateless scalability"""
+    if session_id in active_interviews:
+        return active_interviews[session_id]
+    
+    state_json = LoadInterviewState(session_id)
+    if state_json:
+        try:
+            data = json.loads(state_json)
+            obj = ActiveInterview.from_dict(data)
+            active_interviews[session_id] = obj # Cache in memory for this worker
+            return obj
+        except Exception as e:
+            logger.error(f"Failed to deserialize session {session_id}: {e}")
+    return None
+
+def persist_interview(interview):
+    """Saves to memory and DB"""
+    active_interviews[interview.session_id] = interview
+    SaveInterviewState(interview.session_id, json.dumps(interview.to_dict()))
+
 active_interviews: dict[str, ActiveInterview] = {}
 
 
@@ -89,6 +137,16 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login_page"))
+        if session.get("role") != "admin":
+            return jsonify({"success": False, "message": "Admin access required"}), 403
+        return f(*args, **kwargs)
+    return wrapper
+
 @app.route("/check-login")
 def check_login():
     if "user_id" in session:
@@ -111,7 +169,8 @@ def register():
     data     = request.get_json()
     name     = data.get("name")
     email    = data.get("email")
-    password = data.get("password")
+    request_admin = data.get("request_admin", False)
+    admin_status = 'pending' if request_admin else 'none'
 
     conn   = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -122,8 +181,8 @@ def register():
 
         hashed_pw = hash_password(password)
         cursor.execute(
-            "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
-            (name, email, hashed_pw),
+            "INSERT INTO users (name, email, password, admin_request_status) VALUES (%s, %s, %s, %s)",
+            (name, email, hashed_pw, admin_status),
         )
         conn.commit()
         return jsonify({"success": True})
@@ -144,7 +203,7 @@ def api_login():
     conn   = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute(
-        "SELECT user_id, name, email, password FROM users WHERE email = %s", (email,)
+        "SELECT user_id, name, email, password, role FROM users WHERE email = %s", (email,)
     )
     user = cursor.fetchone()
     cursor.close()
@@ -153,7 +212,8 @@ def api_login():
     if user and check_password(password, user["password"]):
         session["user_id"] = user["user_id"]
         session["name"]    = user["name"]
-        return jsonify({"message": "Login successful"}), 200
+        session["role"]    = user["role"]
+        return jsonify({"message": "Login successful", "role": user["role"]}), 200
 
     return jsonify({"error": "Invalid email or password"}), 401
 
@@ -175,14 +235,19 @@ def interview_page():
 @app.route("/dashboard")
 @login_required
 def dashboard_page():
-    return render_template("Dashboard.html", active_page='dashboard')
+    return render_template("dashboard.html", active_page='dashboard')
+
+@app.route("/admin/dashboard")
+@admin_required
+def admin_dashboard_page():
+    return render_template("admin_dashboard.html", active_page='admin')
 
 
 @app.route("/feedback")
 @app.route("/feedback/<session_id>")
 @login_required
 def feedback_page(session_id=None):
-    return render_template("Feedback.html", session_id=session_id, active_page='feedback')
+    return render_template("feedback.html", session_id=session_id, active_page='feedback')
 
 
 @app.route("/api/feedback/<session_id>")
@@ -203,9 +268,9 @@ def get_feedback_api(session_id):
 
     # We also want the history from the memory session if it's still there
     history = []
-    if session_id in active_interviews:
-        # Additional memory-session security check could go here if needed
-        history = active_interviews[session_id].history
+    interview = get_active_interview(session_id)
+    if interview:
+        history = interview.history
 
     if res and res["feedback"] and res["feedback"] != "Pending Final Evaluation":
         return jsonify({
@@ -215,9 +280,9 @@ def get_feedback_api(session_id):
             "history": history
         })
     
-    # If not in DB but in memory
-    if session_id in active_interviews:
-        interview = active_interviews[session_id]
+    # If not in DB but in memory/metadata
+    interview = get_active_interview(session_id)
+    if interview:
         return jsonify({
             "feedback": getattr(interview, 'feedback', "Generating..."),
             "history": interview.history
@@ -268,7 +333,7 @@ def chrome_devtools_json():
 def progress_dash():
     user_id=session.get("user_id")
     user_name=session.get("name","user")
-    return render_template("Progress.html",user_id=user_id,user_name=user_name, active_page='progress')
+    return render_template("progress.html",user_id=user_id,user_name=user_name, active_page='progress')
 # Get user sessions
 @app.route("/get-user-sessions",methods=["GET"])
 @login_required
@@ -282,6 +347,17 @@ def get_user_session():
         order by session_date desc
     """,(user_id,))
     sessions=cursor.fetchall()
+    
+    # Format the data properly to avoid JSON serialization errors
+    for session_record in sessions:
+        if isinstance(session_record.get('session_date'), datetime):
+            session_record['session_date'] = session_record['session_date'].strftime('%Y-%m-%d %H:%M:%S')
+        elif session_record.get('session_date'):
+            session_record['session_date'] = str(session_record['session_date'])
+            
+        if session_record.get('score') is not None:
+            session_record['score'] = float(session_record['score'])
+            
     cursor.close()
     conn.close()
     return jsonify(sessions)
@@ -378,6 +454,7 @@ def update_user_resume():
 # STEP 1: Generate HR Question & Create Session
 # ============================================================
 @app.route("/hr-questions", methods=["POST"])
+@login_required
 def hr_questions():
     if request.is_json:
         data = request.json
@@ -409,12 +486,13 @@ def hr_questions():
 
     try:
         # Check if we have an active session to continue
-        if session_id and session_id in active_interviews:
-            interview = active_interviews[session_id]
+        interview = get_active_interview(session_id) if session_id else None
+        
+        if interview:
             interview.difficulty_level = level
         else:
             interview = ActiveInterview(final_jd, final_resume, level)
-            active_interviews[interview.session_id] = interview
+            persist_interview(interview)
             
         # State machine dict context
         state_dict = {
@@ -435,6 +513,23 @@ def hr_questions():
         current_turn = {"question": question, "answer": "", "feedback": ""}
         interview.history.append(current_turn)
         
+        # Guarantee it shows up immediately on the progress dashboard! 
+        if session.get("user_id"):
+            topic_str = f"{stage} | {interview.jd_text[:20]}..." if interview.jd_text else stage
+            db_data = {
+                "session_id": interview.session_id,
+                "user_id": session.get("user_id"),
+                "topic": topic_str,
+                "question": question,
+                "answer": "In Progress / Unanswered",
+                "score": 0,
+                "feedback": "In Progress...",
+                "session_date": datetime.now()
+            }
+            StoreSession(db_data)
+        
+        persist_interview(interview)
+        
         return jsonify({
             "session_id":       interview.session_id,
             "question":         interview.current_question,
@@ -454,6 +549,7 @@ def hr_questions():
 # STEP 2-3: Submit Answer without Blocking Evaluation
 # ============================================================
 @app.route("/submit-answer", methods=["POST"])
+@login_required
 def submit_answer():
     data        = request.json
     session_id  = data.get("session_id")
@@ -463,15 +559,15 @@ def submit_answer():
     if not transcript.strip():
         return jsonify({"error": "Empty transcript"}), 400
 
-    if session_id not in active_interviews:
-        return jsonify({"error": "Invalid session ID"}), 400
+    interview = get_active_interview(session_id)
+    if not interview:
+        return jsonify({"error": "Invalid or expired session ID"}), 400
 
-    interview = active_interviews[session_id]
-
-    # Update the turn in history
+    # Update the turn in history with transcript and posture data
     if interview.history:
         interview.history[-1]['answer'] = transcript
         interview.history[-1]['feedback'] = "Pending Evaluation"
+        interview.history[-1]['posture'] = frontend_posture
 
     db_topic = f"{interview.current_stage} | {interview.jd_text[:30]}..." if interview.jd_text else interview.current_stage
 
@@ -487,6 +583,7 @@ def submit_answer():
     }
 
     StoreSession(db_data)
+    persist_interview(interview)
 
     return jsonify({
         "status": "success",
@@ -498,34 +595,40 @@ def submit_answer():
 # STEP 4: Evaluate Entire Interview
 # ============================================================
 @app.route("/finish-interview", methods=["POST"])
+@login_required
 def finish_interview():
     data = request.json
     session_id = data.get("session_id")
     
-    if session_id not in active_interviews:
-        return jsonify({"error": "Invalid session ID"}), 400
-
-    interview = active_interviews[session_id]
+    interview = get_active_interview(session_id)
+    if not interview:
+        return jsonify({"error": "Invalid or expired session ID"}), 400
     
     try:
         feedback = llm_service.evaluate_all(interview)
         
-        # Extract score using regex, expecting '## Score\n[X]/10' or similar
+        # Extract score using resilient regex avoiding format failures
         import re
         score = 0
-        match = re.search(r'## Score\s*\n*\s*(\d+(?:\.\d+)?)/10', feedback, re.IGNORECASE)
-        if not match:
-            # Maybe just simple number match
-            match = re.search(r'(\d+)/10', feedback)
+        match = re.search(r'(\d+(?:\.\d+)?)\s*/\s*10', feedback)
         
         if match:
             score = float(match.group(1))
             
-        # Update DB with final feedback and score
+        # Safely Upsert: Guarantee row exists, and force overwrite score/feedback.
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("UPDATE interview_sessions SET feedback=%s, score=%s WHERE session_id=%s", (feedback, score, session_id))
+            topic_str = interview.current_stage if interview.current_stage else "Final Interview Review"
+            question_str = interview.current_question if interview.current_question else "Overall assessment"
+            cursor.execute("""
+                INSERT INTO interview_sessions 
+                (session_id, user_id, topic, question, answer, score, feedback, session_date)
+                VALUES (%s, %s, %s, %s, 'Auto-Completed / Skipped', %s, %s, NOW())
+                ON DUPLICATE KEY UPDATE 
+                feedback = VALUES(feedback),
+                score = VALUES(score)
+            """, (session_id, session.get("user_id"), topic_str, question_str, score, feedback))
             conn.commit()
             cursor.close()
             conn.close()
@@ -551,6 +654,7 @@ def finish_interview():
 # NEW ► STOP SESSION
 # ============================================================
 @app.route("/stop-session", methods=["POST"])
+@login_required
 def stop_session():
     """
     Call this after evaluation or when the user resets.
@@ -562,16 +666,115 @@ def stop_session():
 # Get Session Data  (unchanged)
 # ============================================================
 @app.route("/session/<session_id>", methods=["GET"])
+@login_required
 def get_session(session_id):
-    if session_id not in active_interviews:
+    interview = get_active_interview(session_id)
+    if not interview:
         return jsonify({"error": "Session not found"}), 404
     return jsonify({
-       "session_id": active_interviews[session_id].session_id,
-       "question_count": active_interviews[session_id].question_count,
-       "current_stage": active_interviews[session_id].current_stage
+       "session_id": interview.session_id,
+       "question_count": interview.question_count,
+       "current_stage": interview.current_stage
     })
 
 
 # ============================================================
+# ADMIN API ROUTES
+# ============================================================
+@app.route("/api/admin/stats", methods=["GET"])
+@admin_required
+def admin_stats():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Total Users
+    cursor.execute("SELECT COUNT(*) as count FROM users")
+    total_users = cursor.fetchone()['count']
+    
+    # Total Interview Sessions
+    cursor.execute("SELECT COUNT(*) as count FROM interview_sessions")
+    total_sessions = cursor.fetchone()['count']
+    
+    cursor.close()
+    conn.close()
+    
+    return jsonify({
+        "success": True,
+        "total_users": total_users,
+        "total_sessions": total_sessions
+    })
+
+@app.route("/api/admin/requests", methods=["GET"])
+@admin_required
+def admin_requests():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Fetch pending admin requests
+    cursor.execute("""
+        SELECT user_id, name, email, admin_request_status 
+        FROM users 
+        WHERE admin_request_status = 'pending'
+    """)
+    requests = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    return jsonify(requests)
+
+@app.route("/api/admin/handle-request", methods=["POST"])
+@admin_required
+def handle_admin_request():
+    data = request.json
+    target_user_id = data.get("user_id")
+    action = data.get("action") # 'approve' or 'reject'
+    
+    if not target_user_id or action not in ['approve', 'reject']:
+        return jsonify({"success": False, "message": "Invalid data"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if action == 'approve':
+        cursor.execute("""
+            UPDATE users 
+            SET role = 'admin', admin_request_status = 'approved' 
+            WHERE user_id = %s
+        """, (target_user_id,))
+    else:
+        cursor.execute("""
+            UPDATE users 
+            SET admin_request_status = 'rejected' 
+            WHERE user_id = %s
+        """, (target_user_id,))
+        
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    return jsonify({"success": True, "message": f"User {action}d successfully"})
+
+@app.route("/api/user/request-admin", methods=["POST"])
+@login_required
+def request_admin_access():
+    user_id = session.get("user_id")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        UPDATE users 
+        SET admin_request_status = 'pending' 
+        WHERE user_id = %s AND role != 'admin'
+    """, (user_id,))
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    return jsonify({"success": True, "message": "Admin request sent"})
+
+# ============================================================
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)

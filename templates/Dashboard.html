@@ -77,6 +77,12 @@
           <i class="ph-bold ph-chat-circle-dots nav-icon"></i>
           <span class="nav-text">Feedback</span>
         </a>
+        {% if session.get('role') == 'admin' %}
+        <a href="/admin/dashboard" class="nav-item {{ 'active' if active_page == 'admin' }}">
+          <i class="ph-bold ph-shield-check nav-icon"></i>
+          <span class="nav-text">Admin</span>
+        </a>
+        {% endif %}
       </nav>
       <div class="sidebar-footer">
         <a href="/logout" class="nav-item" style="color: var(--danger);">
@@ -91,6 +97,13 @@
       <header class="header">
         <h1>Dashboard</h1>
         <p class="subtitle">Welcome to SkillUp. Here's how to master your interview skills.</p>
+        {% if session.get('role') != 'admin' %}
+        <div id="admin-request-box" style="margin-top: 15px;">
+            <button onclick="requestAdmin()" id="admin-request-btn" class="btn-secondary btn-sm">
+                <i class="ph-bold ph-shield-plus"></i> Request Admin Access
+            </button>
+        </div>
+        {% endif %}
       </header>
 
       <div class="container">
@@ -136,6 +149,32 @@
   </div>
   {% include 'chatbot.html' %}
   <script src="/static/js/chatbot.js"></script>
+  <script>
+    async function requestAdmin() {
+        const btn = document.getElementById('admin-request-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph-bold ph-spinner-gap ph-spin"></i> Sending...';
+        
+        try {
+            const response = await fetch('/api/user/request-admin', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                btn.innerHTML = '<i class="ph-bold ph-check"></i> Request Sent';
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-success'); // Assuming you have this or just style it
+                btn.style.background = 'var(--success)';
+                btn.style.color = 'white';
+            } else {
+                btn.innerHTML = '<i class="ph-bold ph-x"></i> Failed';
+                btn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error requesting admin:', error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ph-bold ph-shield-plus"></i> Request Admin Access';
+        }
+    }
+  </script>
 </body>
 
 </html>

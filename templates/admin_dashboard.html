@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - SkillUp Interview</title>
+    <link rel="stylesheet" href='/static/css/style.css'>
+    <script src="/static/js/phosphor-icons.js" defer></script>
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            backdrop-filter: var(--glass-blur);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid var(--border-glass);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--border-accent);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            background: var(--accent-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+        }
+
+        .stat-info h3 {
+            font-size: 0.9em;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: var(--text-white);
+            font-family: var(--font-heading);
+        }
+
+        .request-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 12px;
+            margin-top: 20px;
+        }
+
+        .request-table th {
+            text-align: left;
+            padding: 12px 20px;
+            color: var(--text-gray);
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .request-table td {
+            padding: 20px;
+            background: var(--bg-input);
+            border-top: 1px solid var(--border-glass);
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .request-table tr td:first-child {
+            border-left: 1px solid var(--border-glass);
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
+        }
+
+        .request-table tr td:last-child {
+            border-right: 1px solid var(--border-glass);
+            border-top-right-radius: 12px;
+            border-bottom-right-radius: 12px;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.85em;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-gray);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon"><i class="ph-bold ph-target"></i></div>
+                <span class="logo-text">SkillUp</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item">
+                    <i class="ph-bold ph-house nav-icon"></i>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+                <a href="/interview" class="nav-item">
+                    <i class="ph-bold ph-user nav-icon"></i>
+                    <span class="nav-text">Interview</span>
+                </a>
+                <a href="/progress-dashboard" class="nav-item">
+                    <i class="ph-bold ph-chart-bar nav-icon"></i>
+                    <span class="nav-text">Progress</span>
+                </a>
+                <a href="/feedback" class="nav-item">
+                    <i class="ph-bold ph-chat-circle-dots nav-icon"></i>
+                    <span class="nav-text">Feedback</span>
+                </a>
+                <a href="/admin/dashboard" class="nav-item active">
+                    <i class="ph-bold ph-shield-check nav-icon"></i>
+                    <span class="nav-text">Admin</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="nav-item" style="color: var(--danger);">
+                    <i class="ph-bold ph-sign-out nav-icon"></i>
+                    <span class="nav-text">Logout</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1>Admin Dashboard</h1>
+                <p class="subtitle">Platform overview and administrative management.</p>
+            </header>
+
+            <div class="container">
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="ph-bold ph-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Total Users</h3>
+                            <div class="stat-value" id="totalUsers">--</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="ph-bold ph-video-camera"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Total Sessions</h3>
+                            <div class="stat-value" id="totalSessions">--</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="ph-bold ph-envelope-open"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Admin Requests</h3>
+                            <div class="stat-value" id="pendingRequestsCount">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Requests Section -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2 class="section-title">Admin Access Requests</h2>
+                    </div>
+                    <div id="requestsContainer">
+                        <div class="empty-state">
+                            <i class="ph-bold ph-spinner-gap ph-spin empty-icon"></i>
+                            <p>Loading requests...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+
+</html>

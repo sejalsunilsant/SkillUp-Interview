@@ -7,19 +7,19 @@ async function loadProgress() {
         if (profileRes.ok) {
             const profile = await profileRes.json();
             const info = profile.streak_info;
-            
+
             // Update Streak UI
             const streakCount = info.streak_count || 0;
             document.getElementById("streakCount").innerText = `${streakCount} Day${streakCount !== 1 ? 's' : ''}`;
-            
+
             const streakPct = Math.min((streakCount / 7) * 100, 100);
             document.getElementById("streakProgress").style.width = `${streakPct}%`;
             document.getElementById("streakGoal").innerText = `${streakCount % 7}/7 days to next milestone`;
-            
+
             // Update Today's Status UI
             const status = info.today_status;
             document.getElementById("todayStatus").innerText = status;
-            
+
             const nextAvail = document.getElementById("nextAvailable");
             if (status === 'Completed') {
                 document.getElementById("todayStatus").style.color = "#48cfad";
@@ -42,25 +42,26 @@ async function loadProgress() {
 
         const res = await fetch(`${API_BASE}/get-user-sessions`);
         if (!res.ok) throw new Error("Failed to fetch sessions");
-        
+
         const sessions = await res.json();
-        
+
         if (sessions.length === 0) {
-            const container = document.querySelector(".container");
-            if (!container.querySelector(".empty-msg")) {
-                container.innerHTML += "<p class='empty-msg' style='text-align:center; padding: 20px;'>No interview sessions found. Start an interview to see your progress!</p>";
-            }
+            document.getElementById("totalSessions").innerText = "0";
+            document.getElementById("avgScore").innerText = "0.0";
+            document.getElementById("sessionTable").innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px; color:#999;'>No interview sessions found. Navigate to the Interview portal to generate your first session records!</td></tr>";
             return;
         }
 
         // OVERVIEW
         document.getElementById("totalSessions").innerText = sessions.length;
 
-        // Process scores as numbers, handling potential string/decimal formats
-        const numericScores = sessions.filter(s => s.score !== null).map(s => parseFloat(s.score) || 0);
+        // Process scores as numbers, excluding pending/0-score sessions from bringing down the average
+        const completedSessions = sessions.filter(s => s.score !== null && parseFloat(s.score) > 0);
+        const numericScores = completedSessions.map(s => parseFloat(s.score));
+        
         const totalScore = numericScores.reduce((sum, score) => sum + score, 0);
         const avgScore = numericScores.length > 0 ? (totalScore / numericScores.length) : 0;
-        
+
         document.getElementById("avgScore").innerText = isNaN(avgScore) ? "0.0" : avgScore.toFixed(1);
         // document.getElementById("latestScore").innerText = numericScores.length > 0 ? numericScores[0].toFixed(1) : "-"; // Element removed in UI update
 
@@ -85,7 +86,7 @@ async function loadProgress() {
         if (sessions.length > 0 && sessions[0].feedback) {
             const feedback = sessions[0].feedback;
             const improvementMatch = feedback.match(/## Critical Areas for Improvement[:\s]*([\s\S]*?)(?=\n##|$)/i);
-            
+
             if (improvementMatch) {
                 const points = improvementMatch[1].trim().split('\n').filter(p => p.trim().includes('-'));
                 if (points.length > 0) {
@@ -100,20 +101,20 @@ async function loadProgress() {
         // SESSION TABLE
         const table = document.getElementById("sessionTable");
         table.innerHTML = ""; // Clear existing
-        
+
         sessions.forEach(s => {
             const row = document.createElement("tr");
             const date = new Date(s.session_date).toLocaleDateString();
-            
+
             const feedbackText = s.feedback || "Review Pending";
             const topicText = s.topic || "General Interview";
             const scoreText = s.score !== null ? (parseFloat(s.score) || 0).toFixed(1) : "Pnd";
 
             // Truncate feedback if too long
-            const displayFeedback = feedbackText.length > 100 
-                ? feedbackText.substring(0, 100) + "..." 
+            const displayFeedback = feedbackText.length > 100
+                ? feedbackText.substring(0, 100) + "..."
                 : feedbackText;
-                
+
             row.innerHTML = `
                 <td>${date}</td>
                 <td title="${topicText}">${topicText}</td>

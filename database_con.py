@@ -178,6 +178,9 @@ def UpdateStreak(user_id):
         today = datetime.now().date()
         
         if last_date == today:
+            cursor.execute("UPDATE sessions SET status = 'Completed' WHERE user_id = %s AND session_date = %s", 
+                           (user_id, today))
+            conn.commit()
             return True
             
         yesterday = today - timedelta(days=1)
@@ -236,5 +239,48 @@ def GetUserStreakInfo(user_id):
     except Exception as e:
         logger.error(f"Error GetUserStreakInfo: {e}")
         return {"streak_count": 0, "last_active_date": None, "today_status": "Error", "hours_until_next": 0}
+    finally:
+        if conn: conn.close()
+
+def SaveInterviewState(session_id, state_json):
+    """Saves the entire ActiveInterview object state as JSON for stateless worker support"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS session_metadata (
+                session_id VARCHAR(100) PRIMARY KEY,
+                state_data LONGTEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO session_metadata (session_id, state_data) 
+            VALUES (%s, %s) 
+            ON DUPLICATE KEY UPDATE state_data = VALUES(state_data)
+        """, (session_id, state_json))
+        conn.commit()
+        cursor.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error SaveInterviewState: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
+def LoadInterviewState(session_id):
+    """Loads the ActiveInterview object state from the database"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT state_data FROM session_metadata WHERE session_id = %s", (session_id,))
+        res = cursor.fetchone()
+        cursor.close()
+        return res['state_data'] if res else None
+    except Exception as e:
+        logger.error(f"Error LoadInterviewState: {e}")
+        return None
     finally:
         if conn: conn.close()

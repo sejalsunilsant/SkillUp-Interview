@@ -234,6 +234,12 @@
                     <i class="ph-bold ph-chat-circle-dots nav-icon"></i>
                     <span class="nav-text">Feedback</span>
                 </a>
+                {% if session.get('role') == 'admin' %}
+                <a href="/admin/dashboard" class="nav-item {{ 'active' if active_page == 'admin' }}">
+                    <i class="ph-bold ph-shield-check nav-icon"></i>
+                    <span class="nav-text">Admin</span>
+                </a>
+                {% endif %}
             </nav>
             <div class="sidebar-footer">
                 <a href="/logout" class="nav-item" style="color: var(--danger);">

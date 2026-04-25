@@ -227,21 +227,31 @@ class InterviewGenratSession:
             return f"## Score 0/10\n\nEvaluation failed due to an error: {str(e)}."
 
     def evaluate_all(self, interview):
-        # Build full transcript of the interview
+        # Build full transcript and emotional summary
         history_str = ""
+        emotion_summary = []
         valid_count = 0
         for i, turn in enumerate(interview.history):
-            if not turn.get('answer', '').strip():
-                continue
-            history_str += f"\nQ{i+1}: {turn.get('question', '')}\nA{i+1}: {turn.get('answer', '')}\n"
+            ans = turn.get('answer', '').strip()
+            if not ans: continue
+            
+            history_str += f"\nQ{i+1}: {turn.get('question', '')}\nA{i+1}: {ans}\n"
+            
+            posture = turn.get('posture', {})
+            if posture:
+                emotion_summary.append(f"Q{i+1} Emotion: {posture.get('dominant_emotion', 'N/A')} (Stability: {posture.get('stability', 'N/A')})")
+            
             valid_count += 1
             
         if valid_count == 0:
             return "## Final Score 0/10\nNo valid answers were recorded to evaluate."
             
+        emotions_str = "\n".join(emotion_summary) if emotion_summary else "No emotion data recorded."
+            
         try:
             prompt = f"""
             You are an expert Head of HR and Senior Interviewer providing a final, comprehensive evaluation for a candidate's entire interview.
+            Use their answers AND their emotional presence/posture data to provide a holistic assessment.
 
             INTERVIEW CONTEXT:
             Job Description / Context: {interview.jd_text}
@@ -250,6 +260,9 @@ class InterviewGenratSession:
 
             FULL INTERVIEW TRANSCRIPT:
             {history_str}
+
+            EMOTIONAL & POSTURE DATA SUMMARY:
+            {emotions_str}
 
             Provide a comprehensive final interview assessment that evaluates the candidate across all questions combined.
             Use EXACTLY the following format:
@@ -262,10 +275,13 @@ class InterviewGenratSession:
             - [Strength 2 based on their answers]
             - [Strength 3 based on their answers]
 
-            ## Critical Areas for Improvement
+            ## Areas for Improvement (including Body Language/Emotions)
             - [Area 1 to improve]
             - [Area 2 to improve]
             - [Area 3 to improve]
+            
+            ## Behavioral & Emotional Analysis
+            [Provide a brief paragraph on their non-verbal communication, emotional stability, and overall confidence detected by the AI]
 
             ## Question Breakdown & HR Expected Answers
             For each question asked in the transcript, provide:
