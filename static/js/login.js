@@ -57,10 +57,12 @@ function register() {
     return;
   }
 
+  const requestAdmin = document.getElementById("reg-request-admin").checked;
+
   fetch("/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email, password })
+    body: JSON.stringify({ name, email, password, request_admin: requestAdmin })
   })
   .then(res => res.json())
   .then(data => {
