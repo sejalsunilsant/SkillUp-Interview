@@ -69,37 +69,51 @@ class AvatarManager {
     this.videoIds.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
+      
+      // Ensure video is visible and playing
       el.classList.remove('hr-media-hidden');
+      el.style.opacity = '1';
+      el.style.zIndex = '2';
+      
       try {
-        el.currentTime = 0;
-        const playPromise = el.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(err => {
-            if (err.name !== 'AbortError') {
-              console.warn('[Avatar] Video play blocked:', err);
-            }
-          });
+        // If the video is paused or at the end, reset and play
+        if (el.paused) {
+          const playPromise = el.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(err => {
+              console.warn(`[Avatar] Video ${id} play failed:`, err);
+            });
+          }
         }
       } catch (e) {
-        console.warn('[Avatar] current time or play error:', e);
+        console.warn(`[Avatar] Video ${id} error:`, e);
       }
     });
     this.imageIds.forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.classList.add('hr-media-hidden');
+      if (el) {
+        el.classList.add('hr-media-hidden');
+        el.style.opacity = '0';
+        el.style.zIndex = '1';
+      }
     });
   }
 
-  // ── Internal: show image, hide video ──────────────────────
   _showImage() {
     this.imageIds.forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.classList.remove('hr-media-hidden');
+      if (el) {
+        el.classList.remove('hr-media-hidden');
+        el.style.opacity = '1';
+        el.style.zIndex = '2';
+      }
     });
     this.videoIds.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       el.classList.add('hr-media-hidden');
+      el.style.opacity = '0';
+      el.style.zIndex = '1';
       try {
         el.pause();
         el.currentTime = 0;
@@ -108,6 +122,8 @@ class AvatarManager {
       }
     });
   }
+
+
 
   // ── Internal: update ring class on containers ─────────────
   _setContainerClass(cls) {

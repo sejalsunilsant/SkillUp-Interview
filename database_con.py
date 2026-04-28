@@ -9,12 +9,24 @@ logger = logging.getLogger(__name__)
 
 # ── DB POLLING CONFIG ──────────────────────────────────────────────────────
 # Using a connection pool is more efficient for production workloads
+db_password = os.getenv("DB_PASSWORD")
+if not db_password and os.getenv("FLASK_ENV") == "production":
+    raise RuntimeError("DB_PASSWORD must be set in production")
+
 db_config = {
     "host":     os.getenv("DB_HOST", "localhost"),
     "user":     os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", "manager"),
-    "database": os.getenv("DB_NAME", "interview_tracker")
+    "password": db_password or "manager",
+    "database": os.getenv("DB_NAME", "interview_tracker"),
+    "port":     int(os.getenv("DB_PORT", 3306))
 }
+
+# ── SSL CONFIG (REQUIRED FOR AIVEN) ────────────────────────────────────────
+ssl_ca = os.getenv("DB_SSL_CA")
+if ssl_ca and os.path.exists(ssl_ca):
+    db_config["ssl_ca"] = ssl_ca
+    db_config["ssl_verify_cert"] = True
+    logger.info(f"SSL CA certificate enabled: {ssl_ca}")
 
 try:
     connection_pool = mysql.connector.pooling.MySQLConnectionPool(

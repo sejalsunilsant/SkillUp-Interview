@@ -1,10 +1,132 @@
 import os
+import threading
+import logging
+from typing import List, Dict, Optional
 from flask import jsonify
 from flask_cors import CORS
 from langchain_groq import ChatGroq
 import json
+import redis
+from rq import Queue
+from rq.job import Job
+import time
 from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+load_dotenv()
+
+def execute_groq_task(system_prompt: str, user_message: str, history: List[Dict[str, str]] = None) -> str:
+    """Task function for Redis Worker execution."""
+    service = GroqChatService()
+    return service._execute_llm(system_prompt, user_message, history)
+
+class GroqChatService:
+    """
+    GroqChatService: A high-performance, semaphore-controlled interface for Groq LLM.
+    """
+    _instance: Optional['GroqChatService'] = None
+    _lock = threading.Lock()
+    _semaphore = threading.Semaphore(10)  # Maximum concurrent LLM requests allowed
+
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(GroqChatService, cls).__new__(cls)
+                cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, model: str = "llama-3.1-8b-instant", temperature: float = 0.7):
+        if self._initialized:
+            return
+        api_key = os.getenv("groq_Api")
+        self.llm = ChatGroq(
+            groq_api_key=api_key,
+            model_name=model,
+            temperature=temperature,
+            max_tokens=4096
+        )
+        # Initialize Redis for heavy traffic fallback
+        try:
+            self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+            self.redis_conn = redis.from_url(self.redis_url)
+            self.queue = Queue("groq_heavy_tasks", connection=self.redis_conn)
+            logger.info("Redis worker queue initialized.")
+        except Exception as e:
+            logger.warning(f"Redis not available, fallback to worker disabled: {e}")
+            self.queue = None
+
+        self._initialized = True
+
+    def get_response(self, system_prompt: str, user_message: str, history: List[Dict[str, str]] = None) -> str:
+        """
+        Sends a request to Groq LLM. Uses local semaphore for normal traffic,
+        and falls back to Redis Workers for heavy traffic.
+        """
+        if history is None:
+            history = []
+
+        # Attempt to acquire local semaphore (Non-blocking)
+        if self._semaphore.acquire(blocking=False):
+            try:
+                logger.info("Handling request via EXISTING flow (Local Semaphore)...")
+                return self._execute_llm(system_prompt, user_message, history)
+            finally:
+                self._semaphore.release()
+        
+        # If semaphore is full and Redis is available, fallback to Worker
+        if self.queue:
+            try:
+                logger.info("⚠️ Heavy traffic detected! Offloading to REDIS WORKER...")
+                job = self.queue.enqueue(
+                    execute_groq_task, 
+                    system_prompt, 
+                    user_message, 
+                    history
+                )
+                
+                # Wait for worker result with a timeout
+                timeout = 30 # seconds
+                start_time = time.time()
+                while not job.is_finished:
+                    if time.time() - start_time > timeout:
+                        return "Service is extremely busy. Please try again in a minute."
+                    if job.is_failed:
+                        return "Worker processing failed. Please try again."
+                    time.sleep(0.5)
+                
+                return job.result
+            except Exception as e:
+                logger.error(f"Redis Worker Fallback Error: {e}")
+                return "The system is currently at maximum capacity. Please wait a moment."
+        
+        # Absolute fallback: Block until semaphore is available
+        logger.info("Redis unavailable and Semaphore full. Blocking thread...")
+        with self._semaphore:
+            return self._execute_llm(system_prompt, user_message, history)
+
+    def _execute_llm(self, system_prompt: str, user_message: str, history: List[Dict[str, str]]) -> str:
+        """Core LLM execution logic used by both local flow and workers."""
+        messages = [("system", system_prompt)]
+        for msg in history[-10:]:
+            role = "human" if msg.get("role") == "user" else "ai"
+            content = msg.get("content", "")
+            if content:
+                messages.append((role, content))
+        messages.append(("human", user_message))
+        
+        try:
+            response = self.llm.invoke(messages)
+            return response.content if hasattr(response, "content") else str(response)
+        except Exception as e:
+            logger.error(f"LLM Execution Error: {str(e)}")
+            raise e
+
+    def get_quick_completion(self, prompt: str) -> str:
+        """Helper for simple completions, using the robust fallback flow."""
+        return self.get_response(system_prompt="You are a helpful assistant.", user_message=prompt, history=[])
 load_dotenv()
 
 # Default questions mapping used if DB is empty
@@ -17,14 +139,21 @@ DEFAULT_QUESTIONS = {
 
 class InterviewGenratSession:
     def __init__(self):
-        self.llm = ChatGroq(
-            groq_api_key=os.getenv("groq_Api"),
-            model_name="llama-3.1-8b-instant",
-            temperature=0.7,
-        )
-    def _embed_and_chunk(self, text, query):
+        self.groq_service = GroqChatService()
+        # Load embedding model once at startup for performance
         try:
             from sentence_transformers import SentenceTransformer
+            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            print("✅ SentenceTransformer model loaded successfully.")
+        except ImportError:
+            self.embedding_model = None
+            print("⚠️ SentenceTransformer not found. Falling back to simple chunking.")
+    
+    def _embed_and_chunk(self, text, query):
+        if not self.embedding_model:
+            return text[:3000]
+            
+        try:
             from sklearn.metrics.pairwise import cosine_similarity
             import numpy as np
 
@@ -33,9 +162,8 @@ class InterviewGenratSession:
             if not chunks:
                 return text[:2000]
 
-            model = SentenceTransformer('all-MiniLM-L6-v2')
-            chunk_embeddings = model.encode(chunks)
-            query_embedding = model.encode([query])
+            chunk_embeddings = self.embedding_model.encode(chunks)
+            query_embedding = self.embedding_model.encode([query])
 
             similarities = cosine_similarity(query_embedding, chunk_embeddings)[0]
             # Get top 3 chunks
@@ -104,8 +232,7 @@ class InterviewGenratSession:
         """
         
         try:
-            result = self.llm.invoke(prompt)
-            question = result.content if hasattr(result, "content") else str(result)
+            question = self.groq_service.get_quick_completion(prompt)
             question = question.strip()
 
             # Clean up introductory flair if any
@@ -218,8 +345,7 @@ class InterviewGenratSession:
             [One-sentence summary and encouragement]
             """
             
-            result   = self.llm.invoke(prompt)
-            feedback = result.content if hasattr(result, "content") else str(result)
+            feedback = self.groq_service.get_quick_completion(prompt)
             return feedback
 
         except Exception as e:
@@ -296,8 +422,7 @@ class InterviewGenratSession:
             [State clearly: Move Forward, Hold, or Reject with a 1-sentence justification]
             """
             
-            result = self.llm.invoke(prompt)
-            return result.content if hasattr(result, "content") else str(result)
+            return self.groq_service.get_quick_completion(prompt)
         
         except Exception as e:
             print("EVALUATE ALL ERROR:", e)
@@ -351,8 +476,7 @@ class InterviewGenratSession:
         """
 
         try:
-            result = self.llm.invoke(prompt)
-            return result.content if hasattr(result, "content") else str(result)
+            return self.groq_service.get_quick_completion(prompt)
         except Exception as e:
             print("HR CHAT ERROR:", e)
             return "I apologize, but I'm having trouble connecting right now. Please try again in a moment."

@@ -22,6 +22,10 @@ numpy==1.26.4
 protobuf==4.25.3
 pillow==10.3.0
 
+# Monitoring & Logging
+sentry-sdk[flask]==2.1.1
+prometheus-flask-exporter==0.23.0
+
 # Utilities
 requests==2.32.5
 typing_extensions==4.15.0
@@ -31,3 +35,5 @@ gunicorn==21.2.0
 sentence-transformers==3.0.1
 scikit-learn==1.5.0
 torch==2.3.1
+redis==5.0.1
+rq==1.15.1

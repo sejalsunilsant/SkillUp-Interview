@@ -8,6 +8,18 @@ import uuid
 import bcrypt
 from functools import wraps
 from Services.Genrator import InterviewGenratSession
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+from prometheus_flask_exporter import PrometheusMetrics
+
+
+# ── MONITORING ─────────────────────────────────────────────────────────────
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    integrations=[FlaskIntegration()],
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 
 
 # ── DB helper (unchanged)
@@ -28,6 +40,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = Flask(__name__)
+metrics = PrometheusMetrics(app)
+metrics.info('app_info', 'Application info', version='1.0.0')
 Compress(app)
 
 # ── SECURITY SETTINGS ──────────────────────────────────────────────────────
@@ -37,14 +51,29 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=1800, # 30 mins
     SEND_FILE_MAX_AGE_DEFAULT=31536000 # 1 year cache for static assets
 )
-CORS(app, resources={r"/*": {"origins": "*"}})
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "prod_fallback_secret_7832")
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+if not app.secret_key:
+    if app.debug:
+        app.secret_key = "debug_secret_key"
+        logger.warning("FLASK_SECRET_KEY not set, using debug secret")
+    else:
+        raise RuntimeError("FLASK_SECRET_KEY must be set in production")
+
+# CORS should be restricted in production
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+CORS(app, resources={r"/*": {"origins": allowed_origins}}, supports_credentials=True)
 
 if not os.getenv("groq_Api"):
     logger.warning("GROQ_API key is not set. Questions will fail to generate.")
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 llm_service=InterviewGenratSession()
+
+
+@app.route("/health")
+def health_check():
+    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()}), 200
+
 
 
 # ============================================================
@@ -90,27 +119,19 @@ from database_con import SaveInterviewState, LoadInterviewState
 import json
 
 def get_active_interview(session_id):
-    """Refactored to check memory first, then DB for stateless scalability"""
-    if session_id in active_interviews:
-        return active_interviews[session_id]
-    
+    """Stateless session retrieval from DB"""
     state_json = LoadInterviewState(session_id)
     if state_json:
         try:
             data = json.loads(state_json)
-            obj = ActiveInterview.from_dict(data)
-            active_interviews[session_id] = obj # Cache in memory for this worker
-            return obj
+            return ActiveInterview.from_dict(data)
         except Exception as e:
             logger.error(f"Failed to deserialize session {session_id}: {e}")
     return None
 
 def persist_interview(interview):
-    """Saves to memory and DB"""
-    active_interviews[interview.session_id] = interview
+    """Saves to DB (Stateless)"""
     SaveInterviewState(interview.session_id, json.dumps(interview.to_dict()))
-
-active_interviews: dict[str, ActiveInterview] = {}
 
 
 # ============================================================
@@ -169,6 +190,7 @@ def register():
     data     = request.get_json()
     name     = data.get("name")
     email    = data.get("email")
+    password = data.get("password")
     request_admin = data.get("request_admin", False)
     admin_status = 'pending' if request_admin else 'none'
 
@@ -777,4 +799,5 @@ def request_admin_access():
 
 # ============================================================
 if __name__ == "__main__":
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
