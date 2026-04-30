@@ -5,14 +5,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def setup_managed_db():
-    print("🚀 Initializing Managed MySQL Database...")
+    print("Initializing Managed MySQL Database...")
     
     config = {
         "host":     os.getenv("DB_HOST", "localhost"),
-        "user":     os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", "manager"),
-        "database": os.getenv("DB_NAME", "interview_tracker"),
-        "port":     int(os.getenv("DB_PORT", 3306))
+        "user":     os.getenv("DB_USER"),
+        "password": os.getenv("DB_PASSWORD"),
+        "database": os.getenv("DB_NAME"),
+        "port":     int(os.getenv("DB_PORT", 12244))
     }
 
     # SSL Support
@@ -34,7 +34,7 @@ def setup_managed_db():
         
         # Create database
         cursor.execute(f"CREATE DATABASE IF NOT EXISTS {config['database']}")
-        print(f"✅ Database '{config['database']}' ensured.")
+        print(f"Database '{config['database']}' ensured.")
         
         cursor.execute(f"USE {config['database']}")
 
@@ -53,7 +53,7 @@ def setup_managed_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
-        print("✅ 'users' table ensured.")
+        print("'users' table ensured.")
 
         # 2. Interview Sessions Table
         cursor.execute("""
@@ -69,7 +69,7 @@ def setup_managed_db():
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
         """)
-        print("✅ 'interview_sessions' table ensured.")
+        print("'interview_sessions' table ensured.")
 
         # 3. Session Metadata (for stateless persistence)
         cursor.execute("""
@@ -79,7 +79,7 @@ def setup_managed_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
         """)
-        print("✅ 'session_metadata' table ensured.")
+        print("'session_metadata' table ensured.")
 
         # 4. Daily Progress Sessions
         cursor.execute("""
@@ -91,7 +91,7 @@ def setup_managed_db():
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
         """)
-        print("✅ 'sessions' progress table ensured.")
+        print("'sessions' progress table ensured.")
 
         # 5. Generated Questions Fallback
         cursor.execute("""
@@ -103,15 +103,15 @@ def setup_managed_db():
             question_text TEXT
         )
         """)
-        print("✅ 'generated_questions' table ensured.")
+        print("'generated_questions' table ensured.")
 
         conn.commit()
         cursor.close()
         conn.close()
-        print("\n✨ Managed Database Setup Complete!")
+        print("\nManaged Database Setup Complete!")
 
     except Exception as e:
-        print(f"❌ Error setting up database: {e}")
+        print(f"Error setting up database: {e}")
 
 if __name__ == "__main__":
     setup_managed_db()
