@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
 metrics = PrometheusMetrics(app)
 metrics.info('app_info', 'Application info', version='1.0.0')
 Compress(app)
@@ -77,6 +77,18 @@ if not os.getenv("groq_Api"):
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 llm_service=InterviewGenratSession()
+
+@app.route("/debug-templates")
+def debug_templates():
+    import os
+    t_dir = os.path.join(app.root_path, app.template_folder)
+    files = os.listdir(t_dir) if os.path.exists(t_dir) else []
+    return jsonify({
+        "template_folder": app.template_folder,
+        "root_path": app.root_path,
+        "exists": os.path.exists(t_dir),
+        "files": files
+    })
 
 
 @app.route("/health")

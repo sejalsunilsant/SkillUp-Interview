@@ -64,15 +64,15 @@ function register() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password, request_admin: requestAdmin })
   })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      msg.textContent = "Registration successful! Please login.";
-      msg.className = "success";
-      showLogin();
-    } else {
-      msg.textContent = data.message;
-      msg.className = "error";
-    }
-  });
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        msg.textContent = "Registration successful! Please login.";
+        msg.className = "success";
+        showLogin();
+      } else {
+        msg.textContent = data.message;
+        msg.className = "error";
+      }
+    });
 }

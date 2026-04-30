@@ -404,10 +404,78 @@
         padding: 40px 28px;
       }
     }
+
+    /* ── Splash Screen ────────────────────────────── */
+    .splash-screen {
+      position: fixed;
+      inset: 0;
+      background: #0d0d1a;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s;
+    }
+
+    .splash-content {
+      text-align: center;
+      animation: splashPulse 2s ease-in-out infinite;
+    }
+
+    .splash-logo {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #6c63ff, #48cfad);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      box-shadow: 0 0 40px rgba(108, 99, 255, 0.4);
+    }
+
+    .splash-name {
+      font-family: 'Sora', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6c63ff, #48cfad);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 2px;
+    }
+
+    @keyframes splashPulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+      }
+    }
+
+    .splash-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
   </style>
 </head>
 
 <body>
+  <!-- Splash Screen / Welcome Page -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+      <div class="splash-logo"><i class="ph-bold ph-target" style="color: white;"></i></div>
+      <h1 class="splash-name">SkillUp Interview</h1>
+    </div>
+  </div>
 
   <div class="login-wrapper">
 
@@ -540,6 +608,14 @@
       const loginHidden = document.getElementById('login-box').classList.contains('hidden');
       if (loginHidden) showLogin(); else showRegister();
     }
+
+    // Splash Screen logic
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        splash.classList.add('hidden');
+      }, 2500); // Display for 2.5 seconds
+    });
   </script>
 
 </body>
