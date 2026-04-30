@@ -143,10 +143,10 @@ class InterviewGenratSession:
         # Use Cloud-based Gemini Embeddings to save RAM (removes need for local 400MB model)
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
         self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
+            model="models/text-embedding-004", # Updated for better performance and 2026 compatibility
             google_api_key=os.getenv("GEMINI_API_KEY")
         )
-        print("✅ Gemini Cloud Embeddings initialized.")
+        logger.info("✅ Gemini Cloud Embeddings initialized with text-embedding-004.")
     def _embed_and_chunk(self, text, query):
         if not self.embeddings:
             return text[:3000]
