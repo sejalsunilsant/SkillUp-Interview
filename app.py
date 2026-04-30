@@ -189,6 +189,7 @@ def check_login():
 # ============================================================
 @app.route("/", methods=["GET"])
 def login_page():
+    logger.info("Accessing login page")
     if "user_id" in session:
         return redirect(url_for("dashboard_page"))
     return render_template("login.html")
