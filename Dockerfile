@@ -10,14 +10,14 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    curl \
-    default-libmysqlclient-dev \
-    pkg-config \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+  libgl1 \
+  libglib2.0-0 \
+  curl \
+  default-libmysqlclient-dev \
+  pkg-config \
+  gcc \
+  python3-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container
 COPY requirements.txt .

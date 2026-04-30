@@ -140,21 +140,18 @@ DEFAULT_QUESTIONS = {
 class InterviewGenratSession:
     def __init__(self):
         self.groq_service = GroqChatService()
-        # Load embedding model once at startup for performance
-        try:
-            from sentence_transformers import SentenceTransformer
-            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-            print("✅ SentenceTransformer model loaded successfully.")
-        except ImportError:
-            self.embedding_model = None
-            print("⚠️ SentenceTransformer not found. Falling back to simple chunking.")
-    
+        # Use Cloud-based Gemini Embeddings to save RAM (removes need for local 400MB model)
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        self.embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",
+            google_api_key=os.getenv("GEMINI_API_KEY")
+        )
+        print("✅ Gemini Cloud Embeddings initialized.")
     def _embed_and_chunk(self, text, query):
-        if not self.embedding_model:
+        if not self.embeddings:
             return text[:3000]
             
         try:
-            from sklearn.metrics.pairwise import cosine_similarity
             import numpy as np
 
             # Simple chunking: split by paragraphs
@@ -162,19 +159,28 @@ class InterviewGenratSession:
             if not chunks:
                 return text[:2000]
 
-            chunk_embeddings = self.embedding_model.encode(chunks)
-            query_embedding = self.embedding_model.encode([query])
+            # Get embeddings from Gemini API
+            chunk_embeddings = np.array(self.embeddings.embed_documents(chunks))
+            query_embedding = np.array(self.embeddings.embed_query(query)).reshape(1, -1)
 
-            similarities = cosine_similarity(query_embedding, chunk_embeddings)[0]
+            # Manual Cosine Similarity to avoid loading scikit-learn (saves ~100MB RAM)
+            norm_query = np.linalg.norm(query_embedding, axis=1, keepdims=True)
+            norm_chunks = np.linalg.norm(chunk_embeddings, axis=1, keepdims=True)
+            similarities = np.dot(query_embedding, chunk_embeddings.T) / (norm_query * norm_chunks.T)
+            similarities = similarities[0]
+
             # Get top 3 chunks
             top_indices = np.argsort(similarities)[-3:][::-1]
-            best_chunks = [chunks[i] for i in top_indices]
+            best_chunks = [chunks[i] for i in top_indices if similarities[i] > 0.3] # filter low relevance
+
+            if not best_chunks:
+                return text[:2000]
 
             return "\n...\n".join(best_chunks)
         except Exception as e:
-            print("Embedding failed or missing dependencies, falling back to full text:", e)
+            logger.error(f"Embedding failed: {e}")
             return text[:3000]  # truncate to save tokens
-
+    
     def get_next_question(self, interview_state: dict):
         count = interview_state.get('question_count', 0)
         level = interview_state.get('level', 'medium')
