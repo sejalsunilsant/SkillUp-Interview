@@ -15,6 +15,18 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        curl \
+        default-libmysqlclient-dev \
+        pkg-config \
+        gcc \
+        python3-dev \
+        && sudo rm -rf /var/lib/apt/lists/*
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
