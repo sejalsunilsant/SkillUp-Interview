@@ -39,11 +39,11 @@ USER appuser
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Healthcheck
+# Healthcheck (checks the dynamic port)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5000/health || exit 1
+  CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
 
-#run
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -"]
+# Run the app using Gunicorn
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-5000} --workers 1 --timeout 120 --access-logfile - --error-logfile -"]
 
 

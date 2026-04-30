@@ -39,6 +39,15 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Log the error with traceback
+    logger.error(f"Unhandled Exception: {str(e)}", exc_info=True)
+    # Return a JSON response for API calls or a generic error page
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    return "Internal Server Error. Please check logs.", 500
+
 app = Flask(__name__)
 metrics = PrometheusMetrics(app)
 metrics.info('app_info', 'Application info', version='1.0.0')
