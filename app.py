@@ -203,7 +203,7 @@ def check_login():
 def login_page():
     logger.info("Accessing login page")
     if "user_id" in session:
-        return redirect(url_for("dashboard_page"))
+        return redirect("dashboard.html")
     return render_template("login.html")
 
 
@@ -279,7 +279,7 @@ def interview_page():
 @app.route("/dashboard")
 @login_required
 def dashboard_page():
-    return render_template("dashboard.html", active_page='dashboard')
+    return render_template("user_dashboard.html", active_page='dashboard')
 
 @app.route("/admin/dashboard")
 @admin_required
@@ -822,4 +822,4 @@ def request_admin_access():
 # ============================================================
 if __name__ == "__main__":
     debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
-    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
