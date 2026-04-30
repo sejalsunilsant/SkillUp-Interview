@@ -69,21 +69,18 @@ class AvatarManager {
     this.videoIds.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
-      
-      // Ensure video is visible and playing
+
+      // Ensure video is visible
       el.classList.remove('hr-media-hidden');
+      el.style.visibility = 'visible';
       el.style.opacity = '1';
       el.style.zIndex = '2';
-      
+
       try {
-        // If the video is paused or at the end, reset and play
-        if (el.paused) {
-          const playPromise = el.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(err => {
-              console.warn(`[Avatar] Video ${id} play failed:`, err);
-            });
-          }
+        // Start playing immediately
+        const playPromise = el.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => console.warn(`[Avatar] Video ${id} play failed:`, err));
         }
       } catch (e) {
         console.warn(`[Avatar] Video ${id} error:`, e);
@@ -93,6 +90,7 @@ class AvatarManager {
       const el = document.getElementById(id);
       if (el) {
         el.classList.add('hr-media-hidden');
+        el.style.visibility = 'hidden';
         el.style.opacity = '0';
         el.style.zIndex = '1';
       }
@@ -104,6 +102,7 @@ class AvatarManager {
       const el = document.getElementById(id);
       if (el) {
         el.classList.remove('hr-media-hidden');
+        el.style.visibility = 'visible';
         el.style.opacity = '1';
         el.style.zIndex = '2';
       }
@@ -112,6 +111,7 @@ class AvatarManager {
       const el = document.getElementById(id);
       if (!el) return;
       el.classList.add('hr-media-hidden');
+      el.style.visibility = 'hidden';
       el.style.opacity = '0';
       el.style.zIndex = '1';
       try {
@@ -149,6 +149,24 @@ class AvatarManager {
   init(id, initialState = 'speaking') {
     console.log('[Avatar] Initialised, anchor:', id);
     this.currentState = 'none'; // force re-trigger
+    
+    // Warm up videos on first interaction
+    const warmUp = () => {
+      this.videoIds.forEach(vid => {
+        const el = document.getElementById(vid);
+        if (el) {
+          el.play().then(() => {
+            el.pause();
+            el.currentTime = 0;
+          }).catch(() => {});
+        }
+      });
+      document.removeEventListener('click', warmUp);
+      document.removeEventListener('keydown', warmUp);
+    };
+    document.addEventListener('click', warmUp);
+    document.addEventListener('keydown', warmUp);
+
     this.setState(initialState);
   }
 

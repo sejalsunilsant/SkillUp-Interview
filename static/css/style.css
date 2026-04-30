@@ -378,9 +378,11 @@ button {
   opacity: 1;
 }
 
-/* Hidden state — completely remove from layout */
+/* Hidden state — keep in DOM but make transparent to prevent reload delays */
 .hr-visual-media.hr-media-hidden {
-  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Speaking ring pulse on container */
