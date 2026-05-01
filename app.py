@@ -46,17 +46,12 @@ Compress(app)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    # Log the error with full traceback to Render logs
-    logger.error("!!! PRODUCTION ERROR !!!")
-    logger.error(f"Path: {request.path}")
-    logger.error(f"Exception: {str(e)}", exc_info=True)
-    
+    # Log the error with traceback
+    logger.error(f"Unhandled Exception: {str(e)}", exc_info=True)
     # Return a JSON response for API calls or a generic error page
     if request.path.startswith('/api/'):
-        return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
-    
-    # In production, we show a slightly more helpful message if it's a template error
-    return f"Internal Server Error: {str(e)}. Please check Render logs for traceback.", 500
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    return "Internal Server Error. Please check logs.", 500
 
 # ── SECURITY SETTINGS ──────────────────────────────────────────────────────
 app.config.update(
@@ -96,36 +91,9 @@ def debug_templates():
     })
 
 
-@app.route("/debug-db")
-def debug_db():
-    from database_con import db_config, get_db_connection
-    import socket
-    
-    results = {
-        "host": db_config.get("host"),
-        "port": db_config.get("port"),
-        "user": db_config.get("user"),
-        "database": db_config.get("database"),
-        "ssl_ca": db_config.get("ssl_ca"),
-        "dns_resolution": "Unknown",
-        "connection": "Unknown"
-    }
-    
-    # Check DNS
-    try:
-        results["dns_resolution"] = socket.gethostbyname(db_config.get("host", ""))
-    except Exception as e:
-        results["dns_resolution"] = f"Error: {str(e)}"
-        
-    # Check Connection
-    try:
-        conn = get_db_connection()
-        results["connection"] = "Success"
-        conn.close()
-    except Exception as e:
-        results["connection"] = f"Failed: {str(e)}"
-        
-    return jsonify(results)
+@app.route("/health")
+def health_check():
+    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()}), 200
 
 
 
@@ -235,7 +203,7 @@ def check_login():
 def login_page():
     logger.info("Accessing login page")
     if "user_id" in session:
-        return redirect(url_for("dashboard_page"))
+        return redirect("dashboard.html")
     return render_template("login.html")
 
 

@@ -18,21 +18,15 @@ db_config = {
     "user":     os.getenv("DB_USER", "root"),
     "password": db_password or "manager",
     "database": os.getenv("DB_NAME", "interview_tracker"),
-    "port":     int(os.getenv("DB_PORT") or 3306),
-    "use_pure": True  # Force pure Python implementation to avoid C-extension DNS issues
+    "port":     int(os.getenv("DB_PORT") or 3306)
 }
 
 # ── SSL CONFIG (REQUIRED FOR AIVEN) ────────────────────────────────────────
 ssl_ca = os.getenv("DB_SSL_CA")
-if ssl_ca:
-    # Resolve absolute path to handle different working directories on Render
-    abs_ssl_ca = os.path.abspath(ssl_ca)
-    if os.path.exists(abs_ssl_ca):
-        db_config["ssl_ca"] = abs_ssl_ca
-        db_config["ssl_verify_cert"] = True
-        logger.info(f"SSL CA certificate enabled: {abs_ssl_ca}")
-    else:
-        logger.warning(f"SSL CA certificate NOT FOUND at {abs_ssl_ca}. Connection to Aiven may fail.")
+if ssl_ca and os.path.exists(ssl_ca):
+    db_config["ssl_ca"] = ssl_ca
+    db_config["ssl_verify_cert"] = True
+    logger.info(f"SSL CA certificate enabled: {ssl_ca}")
 
 try:
     connection_pool = mysql.connector.pooling.MySQLConnectionPool(

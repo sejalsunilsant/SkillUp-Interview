@@ -149,7 +149,7 @@ class AvatarManager {
   init(id, initialState = 'speaking') {
     console.log('[Avatar] Initialised, anchor:', id);
     this.currentState = 'none'; // force re-trigger
-    
+
     // Warm up videos on first interaction
     const warmUp = () => {
       this.videoIds.forEach(vid => {
@@ -158,7 +158,7 @@ class AvatarManager {
           el.play().then(() => {
             el.pause();
             el.currentTime = 0;
-          }).catch(() => {});
+          }).catch(() => { });
         }
       });
       document.removeEventListener('click', warmUp);
