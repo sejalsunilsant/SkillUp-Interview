@@ -207,15 +207,16 @@ class AvatarManager {
 
     const utterance = new SpeechSynthesisUtterance(text);
 
-    // Pick best available voice
+    // Pick best available voice (Preferring Male for 'Alex')
     const voices = window.speechSynthesis.getVoices();
     const bestVoice = voices.find(v =>
       v.lang.startsWith('en') &&
-      (v.name.includes('Google') || v.name.includes('Female') || v.name.includes('Samantha'))
-    );
+      (v.name.includes('Male') || v.name.includes('David') || v.name.includes('James') || v.name.includes('Google US English'))
+    ) || voices.find(v => v.lang.startsWith('en')); // Fallback to any English voice
+    
     if (bestVoice) utterance.voice = bestVoice;
     utterance.rate = 0.95;
-    utterance.pitch = 1.05;
+    utterance.pitch = 0.9; // Lowered pitch slightly for a more masculine tone
 
     // Word highlight
     const display = document.getElementById('question-display');
