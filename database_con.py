@@ -18,7 +18,8 @@ db_config = {
     "user":     os.getenv("DB_USER", "root"),
     "password": db_password or "manager",
     "database": os.getenv("DB_NAME", "interview_tracker"),
-    "port":     int(os.getenv("DB_PORT") or 3306)
+    "port":     int(os.getenv("DB_PORT") or 3306),
+    "use_pure": True  # Force pure Python implementation to avoid C-extension DNS issues
 }
 
 # ── SSL CONFIG (REQUIRED FOR AIVEN) ────────────────────────────────────────
