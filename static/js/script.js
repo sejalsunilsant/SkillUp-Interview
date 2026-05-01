@@ -205,58 +205,96 @@ class AvatarManager {
     this.setState('speaking');
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    // Pick best available voice (Preferring Male for 'Alex')
-    const voices = window.speechSynthesis.getVoices();
-    const bestVoice = voices.find(v =>
-      v.lang.startsWith('en') &&
-      (v.name.includes('Male') || v.name.includes('David') || v.name.includes('James') || v.name.includes('Google US English'))
-    ) || voices.find(v => v.lang.startsWith('en')); // Fallback to any English voice
-    
-    if (bestVoice) utterance.voice = bestVoice;
-    utterance.rate = 0.95;
-    utterance.pitch = 0.9; // Lowered pitch slightly for a more masculine tone
-
-    // Word highlight
-    const display = document.getElementById('question-display');
-    if (display) {
-      const words = text.split(' ');
-      display.innerHTML = words
-        .map(w => `<span style="opacity:0.5;transition:opacity 0.12s,font-weight 0.12s">${w}</span>`)
-        .join(' ');
-
-      let wordIndex = 0;
-      utterance.onboundary = (event) => {
-        if (event.name === 'word') {
-          const spans = display.querySelectorAll('span');
-          spans.forEach(s => {
-            s.style.opacity = '0.5';
-            s.style.fontWeight = '';
-          });
-          if (spans[wordIndex]) {
-            spans[wordIndex].style.opacity = '1';
-            spans[wordIndex].style.fontWeight = '700';
-            wordIndex++;
-          }
+    const playSpeech = () => {
+      const voices = window.speechSynthesis.getVoices();
+      
+      // If voices aren't loaded yet, retry in 100ms (max 10 times)
+      if (voices.length === 0) {
+        if (!this._voiceRetryCount) this._voiceRetryCount = 0;
+        if (this._voiceRetryCount < 10) {
+          this._voiceRetryCount++;
+          setTimeout(playSpeech, 100);
+          return;
         }
+      }
+      this._voiceRetryCount = 0;
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Names to include (Male)
+      const maleNames = ['Male', 'David', 'James', 'Mark', 'Daniel', 'Andrew', 'Paul', 'Brian', 'Guy', 'Liam', 'Microsoft David', 'Google UK English Male', 'Alex'];
+      // Names to exclude (Female)
+      const femaleNames = ['Female', 'Zira', 'Samantha', 'Susan', 'Hazel', 'Google US English', 'Google UK English Female', 'Microsoft Zira', 'Google US English Female'];
+
+      // Find best male voice
+      let bestVoice = voices.find(v => 
+        v.lang.startsWith('en') && 
+        maleNames.some(name => v.name.includes(name)) &&
+        !femaleNames.some(name => v.name.includes(name))
+      );
+
+      // Fallback: any voice that doesn't sound female
+      if (!bestVoice) {
+        bestVoice = voices.find(v => 
+          v.lang.startsWith('en') && 
+          !femaleNames.some(name => v.name.includes(name))
+        );
+      }
+
+      // Final Fallback: any English voice
+      if (!bestVoice) {
+        bestVoice = voices.find(v => v.lang.startsWith('en'));
+      }
+
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+        console.log('[Speech] Using voice:', bestVoice.name);
+      }
+
+      utterance.rate = 0.9; // Slightly slower for more authority
+      utterance.pitch = 0.8; // Lowered pitch for a deeper, more masculine tone
+
+      // Word highlight
+      const display = document.getElementById('question-display');
+      if (display) {
+        const words = text.split(' ');
+        display.innerHTML = words
+          .map(w => `<span style="opacity:0.5;transition:opacity 0.12s,font-weight 0.12s">${w}</span>`)
+          .join(' ');
+
+        let wordIndex = 0;
+        utterance.onboundary = (event) => {
+          if (event.name === 'word') {
+            const spans = display.querySelectorAll('span');
+            spans.forEach(s => {
+              s.style.opacity = '0.5';
+              s.style.fontWeight = '';
+            });
+            if (spans[wordIndex]) {
+              spans[wordIndex].style.opacity = '1';
+              spans[wordIndex].style.fontWeight = '700';
+              wordIndex++;
+            }
+          }
+        };
+      }
+
+      utterance.onend = () => {
+        setTimeout(() => {
+          this.setState('listening');
+        }, 300);
       };
-    }
 
-    utterance.onend = () => {
-      setTimeout(() => {
-        this.setState('listening');
-      }, 300);
+      utterance.onerror = (e) => {
+        console.warn('[Avatar] Speech error:', e.error);
+        this.setState('idle');
+        if (display) display.innerText = text;
+      };
+
+      window.speechSynthesis.speak(utterance);
     };
 
-
-    utterance.onerror = (e) => {
-      console.warn('[Avatar] Speech error:', e.error);
-      this.setState('idle');
-      if (display) display.innerText = text;
-    };
-
-    window.speechSynthesis.speak(utterance);
+    playSpeech();
   }
 
   startListening() { this.setState('listening'); }
