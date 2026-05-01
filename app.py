@@ -1,5 +1,6 @@
 import os
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
+from werkzeug.exceptions import HTTPException
 from flask_cors import CORS
 from flask_compress import Compress
 from dotenv import load_dotenv
@@ -44,10 +45,19 @@ metrics = PrometheusMetrics(app)
 metrics.info('app_info', 'Application info', version='1.0.0')
 Compress(app)
 
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
+
 @app.errorhandler(Exception)
 def handle_exception(e):
-    # Log the error with traceback
+    # Pass through HTTP errors (like 404, 405, etc.)
+    if isinstance(e, HTTPException):
+        return e
+
+    # Log non-HTTP exceptions with traceback
     logger.error(f"Unhandled Exception: {str(e)}", exc_info=True)
+    
     # Return a JSON response for API calls or a generic error page
     if request.path.startswith('/api/'):
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
