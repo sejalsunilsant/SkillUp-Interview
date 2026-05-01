@@ -24,10 +24,15 @@ db_config = {
 
 # ── SSL CONFIG (REQUIRED FOR AIVEN) ────────────────────────────────────────
 ssl_ca = os.getenv("DB_SSL_CA")
-if ssl_ca and os.path.exists(ssl_ca):
-    db_config["ssl_ca"] = ssl_ca
-    db_config["ssl_verify_cert"] = True
-    logger.info(f"SSL CA certificate enabled: {ssl_ca}")
+if ssl_ca:
+    # Resolve absolute path to handle different working directories on Render
+    abs_ssl_ca = os.path.abspath(ssl_ca)
+    if os.path.exists(abs_ssl_ca):
+        db_config["ssl_ca"] = abs_ssl_ca
+        db_config["ssl_verify_cert"] = True
+        logger.info(f"SSL CA certificate enabled: {abs_ssl_ca}")
+    else:
+        logger.warning(f"SSL CA certificate NOT FOUND at {abs_ssl_ca}. Connection to Aiven may fail.")
 
 try:
     connection_pool = mysql.connector.pooling.MySQLConnectionPool(
