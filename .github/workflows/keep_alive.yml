@@ -1,0 +1,16 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Render App
+        run: |
+          echo "Pinging server..."
+          curl -s -o /dev/null -w "%{http_code}" https://skillup-interview.onrender.com/health || echo "Server not responding"
