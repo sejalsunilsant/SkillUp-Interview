@@ -2,13 +2,15 @@ name: Keep Render Awake
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
       - name: Ping Render App
         run: |
           echo "Pinging server to keep it awake..."
