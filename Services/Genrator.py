@@ -38,7 +38,7 @@ class GroqChatService:
                 cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self, model: str = "llama-3.1-8b-instant", temperature: float = 0.7):
+    def __init__(self, model: str = "openai/gpt-oss-20b", temperature: float = 0.7):
         if self._initialized:
             return
         api_key = os.getenv("groq_Api")
